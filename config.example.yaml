@@ -1,0 +1,73 @@
+# ============================================================
+# SpaceMolt Commander - Configuration Example
+# ============================================================
+# Copy this file to config.yaml and fill in your values.
+# Alternatively, run: python -m spacemolt_commander.setup_config
+# ============================================================
+
+# ----------------------------------------------------------
+# LLM Configuration (Abacus RouteLLM API)
+# ----------------------------------------------------------
+llm:
+  # Your Abacus RouteLLM API key (required)
+  api_key: "YOUR_ABACUS_ROUTELLM_API_KEY"
+
+  # Abacus RouteLLM API base URL
+  api_base_url: "https://apis.abacus.ai/api/routellm"
+
+  # Model to use via RouteLLM
+  model: "routellm"
+
+  # Maximum tokens per LLM request
+  max_tokens: 1024
+
+  # Temperature for LLM responses (0.0 - 1.0)
+  temperature: 0.7
+
+# ----------------------------------------------------------
+# Spacemolt Game API Configuration
+# ----------------------------------------------------------
+game_api:
+  # Default Spacemolt game API endpoint
+  base_url: "https://game.spacemolt.com/api/v2/"
+
+  # Request timeout in seconds
+  timeout: 30
+
+  # Maximum retries on failure
+  max_retries: 3
+
+# ----------------------------------------------------------
+# Player Configuration
+# ----------------------------------------------------------
+player:
+  # Your in-game player name
+  name: "YourPlayerName"
+
+# ----------------------------------------------------------
+# Session Configuration
+# ----------------------------------------------------------
+session:
+  # Default session directory
+  # Sessions are stored under ~/.spacemolt/sessions/<session_name>/
+  default_session: "default"
+
+# ----------------------------------------------------------
+# Logging Configuration
+# ----------------------------------------------------------
+logging:
+  # Enable detailed logging
+  enabled: true
+
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "DEBUG"
+
+  # Log file is written to the session directory:
+  #   ~/.spacemolt/sessions/default/session.log
+  log_filename: "session.log"
+
+  # Log format with timestamps and function names
+  format: "%(asctime)s - %(name)s - %(funcName)s - %(levelname)s - %(message)s"
+
+  # Date format for timestamps
+  date_format: "%Y-%m-%d %H:%M:%S"
