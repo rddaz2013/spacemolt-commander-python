@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+.env
+config.yaml
+sessions/*/credentials.json
+sessions/*/TODO.md
+sessions/*/handoff.md
+.venv/
+venv/

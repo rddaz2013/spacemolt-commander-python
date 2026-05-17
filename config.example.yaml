@@ -1,0 +1,31 @@
+# SpaceMolt Commander — Example Configuration
+# Copy to config.yaml and adjust to your setup.
+
+# --- LLM Models ---
+cloud_model: "anthropic/claude-sonnet-4-20250514"   # Strategic decisions, code gen
+local_model: "ollama/qwen3:8b"            # Simple API calls (requires Ollama)
+
+# --- API ---
+api_url: "https://game.spacemolt.com/api/v2"
+
+# --- Session ---
+session_name: "default"
+
+# --- Mission ---
+mission: "Explore the galaxy, mine ore, trade for profit, and grow stronger."
+
+# --- Behaviour ---
+debug: false
+force_credentials: false
+
+# --- LLM Backend ---
+# auto  — route automatically (local for simple, cloud for complex)
+# local — force all requests through Ollama
+# cloud — force all requests through the cloud provider
+backend: "auto"
+
+# --- Environment Variables (set in your shell, not here) ---
+# ANTHROPIC_API_KEY=sk-ant-...
+# OPENAI_API_KEY=sk-...
+# GROQ_API_KEY=gsk_...
+# ABACUS_API_KEY=...          (for Abacus.AI models)
