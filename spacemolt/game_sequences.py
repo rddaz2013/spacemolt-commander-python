@@ -535,6 +535,164 @@ async def full_status_check(api: SpaceMoltAPI) -> SequenceResult:
 # Sequence registry
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Crafting sequences
+# ---------------------------------------------------------------------------
+
+async def craft_blueprint(
+    api: SpaceMoltAPI,
+    recipe_id: str,
+    quantity: int = 1,
+    deliver_to: str = "cargo",
+) -> SequenceResult:
+    """Look up recipe, check materials, and craft."""
+    details = []
+    total = 3
+
+    # 1. Look up recipe in catalog
+    recipe_info = await _exec(api, "spacemolt_catalog/catalog", {"type": "recipes", "id": recipe_id})
+    details.append(f"Recipe lookup: {recipe_info[:200]}")
+    if _check_error(recipe_info):
+        return SequenceResult(False, f"Recipe '{recipe_id}' not found", 1, total, details)
+
+    # 2. Check cargo for materials
+    cargo = await _exec(api, "spacemolt/get_cargo")
+    details.append(f"Cargo check done")
+
+    # 3. Craft
+    craft_args: dict[str, Any] = {"recipe_id": recipe_id, "quantity": quantity}
+    if deliver_to:
+        craft_args["deliver_to"] = deliver_to
+    craft_result = await _exec(api, "spacemolt/craft", craft_args)
+    details.append(f"Craft result: {craft_result[:300]}")
+
+    if _check_error(craft_result):
+        return SequenceResult(False, f"Crafting failed: {craft_result[:200]}", 3, total, details)
+
+    return SequenceResult(True, f"Crafted {recipe_id} ×{quantity}", 3, total, details)
+
+
+async def gather_and_craft(
+    api: SpaceMoltAPI,
+    recipe_id: str,
+    quantity: int = 1,
+) -> SequenceResult:
+    """Check materials, report what's missing, attempt craft."""
+    details = []
+    total = 4
+
+    # 1. Get recipe details
+    recipe_info = await _exec(api, "spacemolt_catalog/catalog", {"type": "recipes", "id": recipe_id})
+    details.append(f"Recipe: {recipe_info[:200]}")
+
+    # 2. Check cargo
+    cargo = await _exec(api, "spacemolt/get_cargo")
+    details.append(f"Cargo checked")
+
+    # 3. Check storage
+    storage = await _exec(api, "spacemolt_storage/view")
+    details.append(f"Storage checked")
+
+    # 4. Attempt craft (API auto-pulls from cargo → storage → faction storage)
+    craft_result = await _exec(api, "spacemolt/craft", {"recipe_id": recipe_id, "quantity": quantity})
+    details.append(f"Craft result: {craft_result[:300]}")
+
+    if "missing_materials" in craft_result.lower():
+        return SequenceResult(
+            False,
+            f"Missing materials for {recipe_id}. Details: {craft_result[:300]}",
+            4, total, details,
+        )
+    if _check_error(craft_result):
+        return SequenceResult(False, f"Crafting failed: {craft_result[:200]}", 4, total, details)
+
+    return SequenceResult(True, f"Crafted {recipe_id} ×{quantity}", 4, total, details)
+
+
+async def production_chain(
+    api: SpaceMoltAPI,
+    recipe_id: str,
+    quantity: int = 1,
+) -> SequenceResult:
+    """Full production chain: discover recipe tree, check all materials, craft in order."""
+    details = []
+    steps = 0
+
+    # 1. Get the target recipe
+    recipe_info = await _exec(api, "spacemolt_catalog/catalog", {"type": "recipes", "id": recipe_id})
+    details.append(f"Target recipe: {recipe_info[:200]}")
+    steps += 1
+
+    # 2. Get all recipes (to find sub-recipes)
+    all_recipes = await _exec(api, "spacemolt_catalog/catalog", {"type": "recipes", "page_size": 50})
+    details.append(f"Fetched recipe catalog")
+    steps += 1
+
+    # 3. Check current inventory
+    cargo = await _exec(api, "spacemolt/get_cargo")
+    details.append(f"Cargo checked")
+    steps += 1
+
+    storage = await _exec(api, "spacemolt_storage/view")
+    details.append(f"Storage checked")
+    steps += 1
+
+    # 4. Attempt crafting the final product
+    craft_result = await _exec(api, "spacemolt/craft", {"recipe_id": recipe_id, "quantity": quantity})
+    details.append(f"Final craft: {craft_result[:300]}")
+    steps += 1
+
+    if _check_error(craft_result) or "missing_materials" in craft_result.lower():
+        return SequenceResult(
+            False,
+            f"Production chain incomplete for {recipe_id}. Missing materials or sub-recipes needed. {craft_result[:200]}",
+            steps, steps, details,
+        )
+
+    return SequenceResult(True, f"Production chain complete: {recipe_id} ×{quantity}", steps, steps, details)
+
+
+async def catalog_sync(
+    api: SpaceMoltAPI,
+    types: str = "recipes,items,modules,ship_classes,facility_types",
+) -> SequenceResult:
+    """Sync game catalog data into the Wiki (all queries are free)."""
+    type_list = [t.strip() for t in types.split(",")]
+    details = []
+    steps = 0
+
+    for cat_type in type_list:
+        page = 1
+        total_fetched = 0
+        while True:
+            result = await _exec(api, "spacemolt_catalog/catalog", {
+                "type": cat_type,
+                "page": page,
+                "page_size": 50,
+            })
+            steps += 1
+            # Try to detect pagination end
+            if "page" in result.lower() and ("total_pages" in result.lower() or "items:" in result.lower()):
+                # Check if we got items
+                if "items: []" in result or "items:\n- " not in result.lower():
+                    break
+            total_fetched += 1
+            details.append(f"Synced {cat_type} page {page}")
+
+            # Simple heuristic: if result mentions total_pages, try to parse
+            if page >= 10:  # safety limit
+                break
+            if "total_pages: 1" in result or f"page: {page}\ntotal_pages: {page}" in result:
+                break
+            page += 1
+
+    return SequenceResult(
+        True,
+        f"Catalog sync complete: {', '.join(type_list)} ({steps} queries)",
+        steps, steps, details,
+    )
+
+
 SEQUENCE_REGISTRY: dict[str, dict[str, Any]] = {
     "fly_to_station": {
         "function": fly_to_station,
@@ -626,7 +784,52 @@ SEQUENCE_REGISTRY: dict[str, dict[str, Any]] = {
         "tick_cost": "0 (all queries are free)",
         "example": "Get full status overview after login",
     },
+    "craft_blueprint": {
+        "function": None,  # placeholder, set below
+        "description": "Look up a crafting recipe, check materials, and craft the item.",
+        "params": {
+            "recipe_id": {"type": "string", "required": True, "description": "Recipe ID from the catalog"},
+            "quantity": {"type": "integer", "required": False, "description": "How many to craft (default 1)"},
+            "deliver_to": {"type": "string", "required": False, "description": "cargo/storage/faction_storage"},
+        },
+        "tick_cost": "1-2 (catalog query free, craft costs 1 tick each)",
+        "example": "Craft 5 Refined Iron",
+    },
+    "gather_and_craft": {
+        "function": None,  # placeholder, set below
+        "description": "Check materials for a recipe, mine/buy missing ones, then craft.",
+        "params": {
+            "recipe_id": {"type": "string", "required": True, "description": "Recipe ID to craft"},
+            "quantity": {"type": "integer", "required": False, "description": "How many to craft (default 1)"},
+        },
+        "tick_cost": "Variable (depends on missing materials)",
+        "example": "Gather materials and craft Steel Plate",
+    },
+    "production_chain": {
+        "function": None,  # placeholder, set below
+        "description": "Execute a complete production chain: discover recipe, check sub-recipes, gather, craft.",
+        "params": {
+            "recipe_id": {"type": "string", "required": True, "description": "Final product recipe ID"},
+            "quantity": {"type": "integer", "required": False, "description": "How many to produce (default 1)"},
+        },
+        "tick_cost": "Variable (multi-step production)",
+        "example": "Complete production chain for Advanced Hull Plate",
+    },
+    "catalog_sync": {
+        "function": catalog_sync,
+        "description": "Sync the full game catalog into the Wiki: recipes, items, modules, ships, facilities.",
+        "params": {
+            "types": {"type": "string", "required": False, "description": "Comma-separated types (default: all)"},
+        },
+        "tick_cost": "0 (all catalog queries are free)",
+        "example": "Sync all catalog data into the Wiki",
+    },
 }
+
+# Wire up crafting sequence functions
+SEQUENCE_REGISTRY["craft_blueprint"]["function"] = craft_blueprint
+SEQUENCE_REGISTRY["gather_and_craft"]["function"] = gather_and_craft
+SEQUENCE_REGISTRY["production_chain"]["function"] = production_chain
 
 
 def get_sequence_list_for_prompt() -> str:

@@ -210,7 +210,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "Each sequence handles errors, retries, and returns a summary. "
                 "Available sequences: fly_to_station, mine_and_return, trade_route, "
                 "combat_patrol, repair_and_refuel, sell_all_cargo, explore_system, "
-                "accept_and_track_mission, full_status_check. "
+                "accept_and_track_mission, full_status_check, craft_blueprint, "
+                "gather_and_craft, production_chain, catalog_sync. "
                 "See the system prompt for details on each sequence."
             ),
             "parameters": {
@@ -222,7 +223,8 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                             "Name of the sequence to execute. One of: "
                             "fly_to_station, mine_and_return, trade_route, "
                             "combat_patrol, repair_and_refuel, sell_all_cargo, "
-                            "explore_system, accept_and_track_mission, full_status_check."
+                            "explore_system, accept_and_track_mission, full_status_check, "
+                            "craft_blueprint, gather_and_craft, production_chain, catalog_sync."
                         ),
                     },
                     "params": {
@@ -232,6 +234,184 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                     },
                 },
                 "required": ["sequence"],
+            },
+        },
+    },
+    # ------------------------------------------------------------------
+    # Wiki tool
+    # ------------------------------------------------------------------
+    {
+        "type": "function",
+        "function": {
+            "name": "query_wiki",
+            "description": (
+                "Query the agent's knowledge base (Wiki). The Wiki automatically collects data "
+                "from all game interactions. Use this BEFORE making API calls to check if you "
+                "already know the answer. Examples:\n"
+                "- 'systems with asteroid_belt' → find mining locations\n"
+                "- 'where did I mine Iron Ore' → mining history\n"
+                "- 'best prices for Fuel' → market data\n"
+                "- 'crafting recipes' → known recipes\n"
+                "- 'stations in system X' → known stations\n"
+                "- 'stats' → wiki statistics overview\n"
+                "If no question is provided, returns wiki statistics."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "Natural language question about the game world.",
+                    },
+                },
+                "required": ["question"],
+            },
+        },
+    },
+    # ------------------------------------------------------------------
+    # Crafting tools
+    # ------------------------------------------------------------------
+    {
+        "type": "function",
+        "function": {
+            "name": "get_recipes",
+            "description": (
+                "Fetch crafting recipes from the game catalog. "
+                "Results are automatically stored in the Wiki."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Filter by category (e.g. 'ore', 'refined', 'component').",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Free-text search for recipe names.",
+                    },
+                    "page": {"type": "integer", "description": "Page number (default 1)."},
+                    "page_size": {"type": "integer", "description": "Items per page (default 20)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_materials",
+            "description": (
+                "Check if you have enough materials to craft a recipe. "
+                "Checks cargo and station storage."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "recipe_id": {
+                        "type": "string",
+                        "description": "The recipe ID from the catalog.",
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "How many to craft (default 1).",
+                    },
+                },
+                "required": ["recipe_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "craft_item",
+            "description": (
+                "Craft an item using a recipe. Costs 1 tick per craft. "
+                "Materials are auto-pulled from cargo → storage → faction storage."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "recipe_id": {
+                        "type": "string",
+                        "description": "The recipe ID from the catalog.",
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "Number of crafts (default 1). Each costs 1 tick.",
+                    },
+                    "deliver_to": {
+                        "type": "string",
+                        "description": "Output destination: 'cargo', 'storage', or 'faction_storage'.",
+                    },
+                },
+                "required": ["recipe_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_catalog",
+            "description": (
+                "Query the game catalog for items, recipes, modules, ship_classes, or facility_types. "
+                "Results are stored in the Wiki for future reference."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "Catalog type: 'items', 'recipes', 'modules', 'ship_classes', 'facility_types'.",
+                    },
+                    "category": {"type": "string", "description": "Filter by category."},
+                    "search": {"type": "string", "description": "Free-text search."},
+                    "id": {"type": "string", "description": "Fetch specific item by ID."},
+                    "tier": {"type": "string", "description": "Filter by tier."},
+                    "empire": {"type": "string", "description": "Filter by empire."},
+                    "page": {"type": "integer"},
+                    "page_size": {"type": "integer"},
+                },
+                "required": ["type"],
+            },
+        },
+    },
+    # ------------------------------------------------------------------
+    # Intel tools
+    # ------------------------------------------------------------------
+    {
+        "type": "function",
+        "function": {
+            "name": "query_intel",
+            "description": (
+                "Query faction system intelligence. Free query — no tick cost. "
+                "Returns info about systems, POIs, and resources shared by faction members."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "system_id": {"type": "string", "description": "Filter by system ID."},
+                    "system_name": {"type": "string", "description": "Search by system name."},
+                    "poi_type": {"type": "string", "description": "Filter by POI type (asteroid_belt, station, etc.)."},
+                    "resource_type": {"type": "string", "description": "Filter by resource type."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_trade_intel",
+            "description": (
+                "Query faction trade intelligence. Free query — no tick cost. "
+                "Returns market prices shared by faction members."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "string", "description": "Filter by item ID."},
+                    "base_id": {"type": "string", "description": "Filter by station/base ID."},
+                    "station_name": {"type": "string", "description": "Search by station name."},
+                },
             },
         },
     },

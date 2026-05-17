@@ -37,6 +37,7 @@ async def run_inner_loop(
     compaction_state: CompactionState,
     force_credentials: bool = False,
     abort_event: Optional[asyncio.Event] = None,
+    wiki: Any = None,
 ) -> tuple[list[dict[str, Any]], CompactionState]:
     """Run the inner tool-calling loop.
 
@@ -128,6 +129,7 @@ async def run_inner_loop(
                 session_store=session_store,
                 code_executor=code_executor,
                 force_credentials=force_credentials,
+                wiki=wiki,
             )
 
             # Append tool result message

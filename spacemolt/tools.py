@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from spacemolt.api import SpaceMoltAPI
 from spacemolt.code_executor import CodeExecutor, CodeExecutionError
@@ -12,10 +12,16 @@ from spacemolt.models import Credentials
 from spacemolt.session import SessionStore
 from spacemolt.ui import log_tool_call, log_tool_result, log_error, json_to_yaml
 
-# Local tool names (including the new execute_sequence)
+if TYPE_CHECKING:
+    from spacemolt.wiki import WikiStore
+
+# Local tool names (including wiki, crafting, intel)
 LOCAL_TOOLS = {
     "save_credentials", "update_todo", "read_todo",
     "status_log", "execute_code", "execute_sequence",
+    "query_wiki", "craft_item", "check_materials",
+    "get_recipes", "query_catalog", "query_intel",
+    "query_trade_intel",
 }
 
 
@@ -27,6 +33,7 @@ async def execute_tool(
     session_store: SessionStore,
     code_executor: CodeExecutor,
     force_credentials: bool = False,
+    wiki: "WikiStore | None" = None,
 ) -> str:
     """Dispatch a tool call and return the result string."""
     log_tool_call(name, args)
@@ -39,6 +46,7 @@ async def execute_tool(
                 api=api,
                 code_executor=code_executor,
                 force_credentials=force_credentials,
+                wiki=wiki,
             )
         elif name == "game":
             command = args.get("command", "")
@@ -73,6 +81,7 @@ async def _execute_local(
     api: SpaceMoltAPI,
     code_executor: CodeExecutor,
     force_credentials: bool,
+    wiki: "WikiStore | None" = None,
 ) -> str:
     if name == "save_credentials":
         creds = Credentials(
@@ -122,5 +131,88 @@ async def _execute_local(
         if not sequence_name:
             return "Error: 'sequence' parameter is required"
         return await run_sequence(api, sequence_name, params)
+
+    # ------------------------------------------------------------------
+    # Wiki tool
+    # ------------------------------------------------------------------
+    if name == "query_wiki":
+        if not wiki:
+            return "Wiki not initialized."
+        question = args.get("question", args.get("query", ""))
+        if not question:
+            # Return stats
+            return json_to_yaml(wiki.get_stats())
+        return wiki.query(question)
+
+    # ------------------------------------------------------------------
+    # Crafting tools
+    # ------------------------------------------------------------------
+    if name == "get_recipes":
+        from spacemolt.crafting import get_crafting_recipes
+        return await get_crafting_recipes(
+            api,
+            category=args.get("category"),
+            search=args.get("search"),
+            page=args.get("page", 1),
+            page_size=args.get("page_size", 20),
+        )
+
+    if name == "check_materials":
+        from spacemolt.crafting import check_crafting_materials
+        recipe_id = args.get("recipe_id", "")
+        if not recipe_id:
+            return "Error: 'recipe_id' is required"
+        return await check_crafting_materials(
+            api, recipe_id, quantity=args.get("quantity", 1),
+        )
+
+    if name == "craft_item":
+        from spacemolt.crafting import craft_item
+        recipe_id = args.get("recipe_id", "")
+        if not recipe_id:
+            return "Error: 'recipe_id' is required"
+        return await craft_item(
+            api, recipe_id,
+            quantity=args.get("quantity", 1),
+            deliver_to=args.get("deliver_to"),
+        )
+
+    if name == "query_catalog":
+        from spacemolt.crafting import query_catalog
+        catalog_type = args.get("type", args.get("catalog_type", ""))
+        if not catalog_type:
+            return "Error: 'type' is required (recipes, items, modules, ship_classes, facility_types)"
+        return await query_catalog(
+            api, catalog_type,
+            category=args.get("category"),
+            search=args.get("search"),
+            item_id=args.get("id"),
+            tier=args.get("tier"),
+            empire=args.get("empire"),
+            page=args.get("page", 1),
+            page_size=args.get("page_size", 20),
+        )
+
+    # ------------------------------------------------------------------
+    # Intel tools
+    # ------------------------------------------------------------------
+    if name == "query_intel":
+        from spacemolt.intel import query_intel
+        return await query_intel(
+            api,
+            system_id=args.get("system_id"),
+            system_name=args.get("system_name"),
+            poi_type=args.get("poi_type"),
+            resource_type=args.get("resource_type"),
+        )
+
+    if name == "query_trade_intel":
+        from spacemolt.intel import query_trade_intel
+        return await query_trade_intel(
+            api,
+            item_id=args.get("item_id"),
+            base_id=args.get("base_id"),
+            station_name=args.get("station_name"),
+        )
 
     return f"Unknown local tool: {name}"

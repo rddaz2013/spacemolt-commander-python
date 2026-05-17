@@ -22,6 +22,7 @@ from spacemolt.models import Credentials
 from spacemolt.game_sequences import get_sequence_list_for_prompt
 from spacemolt.schema import fetch_commands, format_command_list
 from spacemolt.session import SessionStore
+from spacemolt.wiki import WikiStore
 from spacemolt.ui import (
     log_error,
     log_info,
@@ -95,17 +96,38 @@ def build_system_prompt(
     # Predefined sequences
     sections.append(f"## Predefined Sequences\n{get_sequence_list_for_prompt()}")
 
+    # Wiki info
+    sections.append(
+        "## Wiki Knowledge Base\n"
+        "You have a persistent Wiki that automatically learns from every game interaction.\n"
+        "- **ALWAYS check the Wiki first** before making API calls (use `query_wiki`).\n"
+        "- The Wiki stores: systems, stations, items, recipes, market prices, mining history, intel.\n"
+        "- Use `catalog_sync` sequence early to populate the Wiki with game catalog data.\n"
+        "- Use `query_wiki` with questions like:\n"
+        '  - "systems with asteroid_belt"\n'
+        '  - "where did I mine Iron Ore"\n'
+        '  - "best prices for Fuel"\n'
+        '  - "crafting recipes"\n'
+        '  - "stats" (wiki overview)\n'
+    )
+
     # Rules / tips
     sections.append(
         "## Rules\n"
         "- Act autonomously. Do not ask the player for input — decide yourself.\n"
-        "- Use 'execute_sequence' for common multi-step workflows (mining, trading, flying, etc.).\n"
+        "- **Check the Wiki first** before querying game data you might already know.\n"
+        "- Use 'execute_sequence' for common multi-step workflows (mining, trading, flying, crafting).\n"
         "- Use the 'game' tool for individual commands not covered by sequences.\n"
         "- Use 'execute_code' for data-heavy analysis (market comparisons, route planning).\n"
         "- Use 'update_todo' to track your goals and progress.\n"
+        "- Use 'query_wiki' to check what you already know before making API calls.\n"
+        "- Use 'get_recipes', 'craft_item', 'check_materials' for crafting workflows.\n"
+        "- Use 'query_intel', 'query_trade_intel' for faction intelligence (free queries).\n"
+        "- Use 'query_catalog' to browse items, recipes, modules, ships, facilities.\n"
         "- Query commands are free. Action commands cost 1 tick (10 s).\n"
         "- Keep your context lean — avoid requesting the same data repeatedly.\n"
         "- PREFER sequences over individual game calls to save tokens and time.\n"
+        "- Run 'catalog_sync' once after login to populate the Wiki with game data.\n"
         "- If you're stuck, try 'spacemolt/get_guide' or 'spacemolt/get_commands'.\n"
         "- Always save credentials after registering or logging in."
     )
@@ -144,6 +166,12 @@ class Commander:
         self._abort_event = asyncio.Event()
         self._game_guide = ""
         self._command_list = ""
+
+        # Initialize Wiki knowledge base
+        wiki_path = self.session_store._dir / "wiki.json"
+        self.wiki = WikiStore(wiki_path)
+        # Attach wiki to API for auto-learning
+        self.api.set_wiki(self.wiki)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -216,6 +244,7 @@ class Commander:
                     compaction_state=self.compaction_state,
                     force_credentials=self.force_credentials,
                     abort_event=self._abort_event,
+                    wiki=self.wiki,
                 )
 
                 if not self._running:

@@ -11,5 +11,6 @@ config.yaml
 sessions/*/credentials.json
 sessions/*/TODO.md
 sessions/*/handoff.md
+sessions/*/wiki.json
 .venv/
 venv/

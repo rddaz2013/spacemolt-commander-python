@@ -1,6 +1,7 @@
 """Async HTTP client for the SpaceMolt v2 REST API.
 
 Handles session lifecycle, rate-limiting, auto-retry, and reconnection.
+Now also feeds every response into the Wiki knowledge base for learning.
 """
 
 from __future__ import annotations
@@ -8,13 +9,16 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import httpx
 
 from spacemolt import __version__
 from spacemolt.models import ApiResponse, ApiSession
 from spacemolt.ui import json_to_yaml, log_error, log_info, log_warning
+
+if TYPE_CHECKING:
+    from spacemolt.wiki import WikiStore
 
 DEFAULT_BASE_URL = "https://game.spacemolt.com/api/v2"
 USER_AGENT = f"SpaceMolt-Commander-Py/{__version__}"
@@ -37,11 +41,16 @@ class SpaceMoltAPI:
         self.debug = debug
         self._session: Optional[ApiSession] = None
         self._credentials: dict[str, str] = {}
+        self._wiki: Optional[WikiStore] = None
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             headers={"User-Agent": USER_AGENT, "Content-Type": "application/json"},
             follow_redirects=True,
         )
+
+    def set_wiki(self, wiki: WikiStore) -> None:
+        """Attach a WikiStore for automatic knowledge extraction."""
+        self._wiki = wiki
 
     # ------------------------------------------------------------------
     # Session lifecycle
@@ -87,6 +96,10 @@ class SpaceMoltAPI:
 
         This is the single entry point used by the ``game`` tool.
         Returns a YAML string (compact, token-efficient).
+
+        Side effects:
+        - Feeds both result and structuredContent to the Wiki knowledge base
+        - Processes notifications for wiki learning
         """
         await self.ensure_session()
 
@@ -102,14 +115,45 @@ class SpaceMoltAPI:
             for n in response.notifications:
                 if isinstance(n, dict):
                     log_notification(n)
+            # Feed notifications to wiki
+            if self._wiki and response.notifications:
+                notifs = [n for n in response.notifications if isinstance(n, dict)]
+                if notifs:
+                    self._wiki.ingest_notifications(notifs)
 
         # Update session if server sent a new one
         if response.session:
             self._session = response.session
 
-        # Return the human-readable result (preferred) or structured content
-        result_data = response.result or response.structured_content or ""
-        result_str = json_to_yaml(result_data) if not isinstance(result_data, str) else result_data
+        # Feed response to Wiki for knowledge extraction
+        if self._wiki:
+            try:
+                self._wiki.ingest_response(
+                    command=command,
+                    args=args,
+                    result=response.result,
+                    structured=response.structured_content,
+                )
+            except Exception:
+                pass  # wiki errors must never block gameplay
+
+        # Build result: combine human-readable text with key structured data
+        result_data = response.result or ""
+        structured = response.structured_content
+
+        # If result is text and we also have structured content, append key fields
+        if isinstance(result_data, str) and structured and isinstance(structured, dict):
+            result_str = result_data
+            # Append structured data summary for LLM context
+            struct_yaml = json_to_yaml(structured)
+            if struct_yaml and len(struct_yaml) < 2000:
+                result_str += "\n---structuredContent---\n" + struct_yaml
+        elif result_data:
+            result_str = json_to_yaml(result_data) if not isinstance(result_data, str) else result_data
+        elif structured:
+            result_str = json_to_yaml(structured) if not isinstance(structured, str) else structured
+        else:
+            result_str = ""
 
         # Truncate
         if len(result_str) > RESULT_TRUNCATION:

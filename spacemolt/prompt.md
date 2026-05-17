@@ -68,13 +68,36 @@ Each sequence handles all intermediate steps, errors, and retries automatically.
 **IMPORTANT**: Always prefer `execute_sequence` over multiple `game` calls for routine tasks.
 Only use individual `game` calls for unique situations not covered by a sequence.
 
+## Crafting
+- Use `get_recipes` to discover crafting recipes (stored in Wiki automatically)
+- Use `check_materials` to verify you have enough materials before crafting
+- Use `craft_item` to craft (costs 1 tick per craft, materials auto-pulled from cargo/storage)
+- Use `craft_blueprint` sequence for the full workflow: recipe lookup → material check → craft
+- Use `gather_and_craft` sequence to check inventory and attempt crafting
+- Use `production_chain` sequence for multi-step crafting with sub-recipes
+- Use `query_catalog` to browse items, modules, ship_classes, facility_types
+
+## Intel System
+- Use `query_intel` to access faction-shared system intelligence (FREE)
+- Use `query_trade_intel` to access faction-shared trade prices (FREE)
+- Intel data is automatically stored in the Wiki for future reference
+
+## Wiki Knowledge Base
+- The Wiki automatically learns from every game interaction
+- **Always check the Wiki first** before making API calls: `query_wiki`
+- After login, run `catalog_sync` sequence to populate the Wiki
+- Example queries: "systems with asteroid_belt", "where did I mine Iron Ore", "crafting recipes"
+
 ## Tips
 - Query commands are FREE (no tick cost) — use them liberally
 - Action commands cost 1 tick (10 seconds) — plan efficiently
+- **Check Wiki first** before querying data you might already know
 - Always check your cargo and fuel before long journeys
 - Save credits for ship upgrades
 - Join a faction for bonuses and protection
 - Use the market to make money through trade
 - Keep your ship repaired and fueled
 - Use `full_status_check` after login for a complete overview
+- Run `catalog_sync` after login to populate the Wiki
 - Use `execute_sequence` for routine multi-step tasks to save tokens
+- Use `query_wiki` to recall previously gathered information
