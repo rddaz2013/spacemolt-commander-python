@@ -7,12 +7,16 @@ from typing import Any
 
 from spacemolt.api import SpaceMoltAPI
 from spacemolt.code_executor import CodeExecutor, CodeExecutionError
+from spacemolt.game_sequences import run_sequence
 from spacemolt.models import Credentials
 from spacemolt.session import SessionStore
 from spacemolt.ui import log_tool_call, log_tool_result, log_error, json_to_yaml
 
-# Local tool names
-LOCAL_TOOLS = {"save_credentials", "update_todo", "read_todo", "status_log", "execute_code"}
+# Local tool names (including the new execute_sequence)
+LOCAL_TOOLS = {
+    "save_credentials", "update_todo", "read_todo",
+    "status_log", "execute_code", "execute_sequence",
+}
 
 
 async def execute_tool(
@@ -106,5 +110,17 @@ async def _execute_local(
             return await code_executor.execute(code)
         except CodeExecutionError as exc:
             return f"Code execution error: {exc}"
+
+    if name == "execute_sequence":
+        sequence_name = args.get("sequence", "")
+        params = args.get("params") or {}
+        if isinstance(params, str):
+            try:
+                params = json.loads(params)
+            except json.JSONDecodeError:
+                return "Error: 'params' must be a valid JSON object"
+        if not sequence_name:
+            return "Error: 'sequence' parameter is required"
+        return await run_sequence(api, sequence_name, params)
 
     return f"Unknown local tool: {name}"

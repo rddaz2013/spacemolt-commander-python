@@ -5,6 +5,18 @@
 cloud_model: "anthropic/claude-sonnet-4-20250514"   # Strategic decisions, code gen
 local_model: "ollama/qwen3:8b"            # Simple API calls (requires Ollama)
 
+# --- LLM Endpoints (flexible configuration) ---
+# Ollama URL — supports local, remote, and IP-based endpoints:
+#   ollama_base_url: "http://localhost:11434"       # Default (local)
+#   ollama_base_url: "http://192.168.1.100:11434"   # Remote Ollama on LAN
+#   ollama_base_url: "http://my-ollama-server:11434" # Remote hostname
+# Also respects the OLLAMA_HOST environment variable.
+
+# Cloud base URL — for custom/alternative providers:
+#   cloud_base_url: "https://routellm.abacus.ai/v1"  # Abacus.AI Router
+#   cloud_base_url: "https://api.openai.com/v1"       # OpenAI direct
+#   cloud_base_url: "https://my-proxy.example.com/v1" # Custom proxy
+
 # --- API ---
 api_url: "https://game.spacemolt.com/api/v2"
 
@@ -28,4 +40,5 @@ backend: "auto"
 # ANTHROPIC_API_KEY=sk-ant-...
 # OPENAI_API_KEY=sk-...
 # GROQ_API_KEY=gsk_...
-# ABACUS_API_KEY=...          (for Abacus.AI models)
+# ABACUS_API_KEY=...          (for Abacus.AI models / Router)
+# OLLAMA_HOST=http://192.168.1.100:11434  (alternative to ollama_base_url)

@@ -200,4 +200,39 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "execute_sequence",
+            "description": (
+                "Execute a predefined multi-step game sequence. "
+                "Use this instead of multiple individual 'game' calls for common workflows. "
+                "Each sequence handles errors, retries, and returns a summary. "
+                "Available sequences: fly_to_station, mine_and_return, trade_route, "
+                "combat_patrol, repair_and_refuel, sell_all_cargo, explore_system, "
+                "accept_and_track_mission, full_status_check. "
+                "See the system prompt for details on each sequence."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "sequence": {
+                        "type": "string",
+                        "description": (
+                            "Name of the sequence to execute. One of: "
+                            "fly_to_station, mine_and_return, trade_route, "
+                            "combat_patrol, repair_and_refuel, sell_all_cargo, "
+                            "explore_system, accept_and_track_mission, full_status_check."
+                        ),
+                    },
+                    "params": {
+                        "type": "object",
+                        "description": "Parameters for the sequence. See system prompt for required/optional params.",
+                        "additionalProperties": True,
+                    },
+                },
+                "required": ["sequence"],
+            },
+        },
+    },
 ]

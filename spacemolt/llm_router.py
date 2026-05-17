@@ -5,6 +5,11 @@ Cloud (Abacus.AI / Anthropic / OpenAI via litellm):
 Local (Ollama via litellm):
   - Simple game-API calls, quick reactions, status checks
 
+Supports flexible base_url configuration for all backends:
+  - Ollama on remote hosts (IP/hostname)
+  - Abacus.AI Router (https://routellm.abacus.ai/v1)
+  - Any OpenAI-compatible endpoint
+
 Routing is based on keyword heuristics + explicit overrides.
 """
 
@@ -14,11 +19,13 @@ import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from urllib.parse import urlparse
 
+import httpx
 import litellm
 
 from spacemolt.models import LLMBackend, TaskComplexity
-from spacemolt.ui import log_llm, log_warning
+from spacemolt.ui import log_info, log_llm, log_warning
 
 # Suppress litellm's noisy logging
 litellm.suppress_debug_info = True
@@ -36,8 +43,19 @@ MODEL_CONTEXT_WINDOWS: dict[str, int] = {
     "ollama/qwen3:8b": 32_000,
     "ollama/llama3.1:8b": 128_000,
     "ollama/mistral:7b": 32_000,
+    # Abacus.AI Router models
+    "abacus/claude-sonnet-4-20250514": 200_000,
+    "abacus/gpt-4o": 128_000,
+    "abacus/gpt-4-turbo": 128_000,
+    "abacus/gpt-3.5-turbo": 16_000,
 }
 DEFAULT_CONTEXT_WINDOW = 32_000
+
+# Default Ollama URL (can be overridden)
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
+
+# Abacus.AI Router URL
+ABACUS_ROUTER_URL = "https://routellm.abacus.ai/v1"
 
 # Keywords that indicate higher complexity
 _HIGH_COMPLEXITY_PATTERNS = [
@@ -50,37 +68,68 @@ _LOW_COMPLEXITY_PATTERNS = [
 ]
 
 
+def _resolve_ollama_url(base_url: Optional[str]) -> str:
+    """Resolve the Ollama API base URL from config or environment.
+
+    Priority: explicit base_url > OLLAMA_HOST env var > default localhost.
+    """
+    if base_url:
+        return base_url.rstrip("/")
+    env_host = os.environ.get("OLLAMA_HOST", "")
+    if env_host:
+        # Ensure it has a scheme
+        if not env_host.startswith("http"):
+            env_host = f"http://{env_host}"
+        return env_host.rstrip("/")
+    return DEFAULT_OLLAMA_URL
+
+
 @dataclass
 class LLMRouter:
-    """Intelligent task router between local and cloud LLMs."""
+    """Intelligent task router between local and cloud LLMs.
+
+    Supports flexible endpoint configuration:
+      - ollama_base_url: URL for Ollama (local or remote, e.g. "http://192.168.1.100:11434")
+      - cloud_base_url:  Custom base URL for cloud provider (e.g. Abacus.AI Router)
+    """
 
     cloud_model: str = DEFAULT_CLOUD_MODEL
     local_model: str = DEFAULT_LOCAL_MODEL
     force_backend: Optional[LLMBackend] = None
     local_available: bool = False  # set after connectivity check
+
+    # Flexible endpoint configuration
+    ollama_base_url: Optional[str] = None   # e.g. "http://192.168.1.100:11434"
+    cloud_base_url: Optional[str] = None    # e.g. "https://routellm.abacus.ai/v1"
+
     _cloud_model_re: list[re.Pattern] = field(default_factory=list, init=False)
     _local_model_re: list[re.Pattern] = field(default_factory=list, init=False)
+    _resolved_ollama_url: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
         self._cloud_model_re = [re.compile(p, re.I) for p in _HIGH_COMPLEXITY_PATTERNS]
         self._local_model_re = [re.compile(p, re.I) for p in _LOW_COMPLEXITY_PATTERNS]
+        self._resolved_ollama_url = _resolve_ollama_url(self.ollama_base_url)
 
     # ------------------------------------------------------------------
     # Connectivity check
     # ------------------------------------------------------------------
 
     async def check_local_availability(self) -> bool:
-        """Ping the local Ollama instance."""
+        """Ping the Ollama instance (local or remote)."""
+        url = self._resolved_ollama_url
         try:
-            import httpx
             async with httpx.AsyncClient(timeout=5.0) as c:
-                resp = await c.get("http://localhost:11434/api/tags")
+                resp = await c.get(f"{url}/api/tags")
                 self.local_available = resp.status_code == 200
         except Exception:
             self.local_available = False
 
-        if not self.local_available:
-            log_warning("Local Ollama not available — all requests will use cloud model")
+        if self.local_available:
+            if url != DEFAULT_OLLAMA_URL:
+                log_info(f"Ollama available at {url}")
+        else:
+            log_warning(f"Ollama not available at {url} — all requests will use cloud model")
         return self.local_available
 
     # ------------------------------------------------------------------
@@ -120,6 +169,25 @@ class LLMRouter:
     # LLM call
     # ------------------------------------------------------------------
 
+    def _build_litellm_kwargs(self, model: str) -> dict[str, Any]:
+        """Build extra kwargs for litellm based on model and endpoint config."""
+        extra: dict[str, Any] = {}
+
+        # Ollama models: set api_base to configured Ollama URL
+        if model.startswith("ollama/") or model.startswith("ollama_chat/"):
+            if self._resolved_ollama_url != DEFAULT_OLLAMA_URL:
+                extra["api_base"] = self._resolved_ollama_url
+
+        # Cloud models with custom base_url (e.g. Abacus.AI Router)
+        elif self.cloud_base_url:
+            extra["api_base"] = self.cloud_base_url
+            # For Abacus.AI Router, use the API key from environment
+            abacus_key = os.environ.get("ABACUS_API_KEY", "")
+            if "abacus" in self.cloud_base_url.lower() and abacus_key:
+                extra["api_key"] = abacus_key
+
+        return extra
+
     async def complete(
         self,
         messages: list[dict[str, Any]],
@@ -157,6 +225,9 @@ class LLMRouter:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
 
+        # Add endpoint-specific kwargs
+        kwargs.update(self._build_litellm_kwargs(model))
+
         try:
             response = await litellm.acompletion(**kwargs)
             return response.model_dump()
@@ -165,6 +236,10 @@ class LLMRouter:
             if "ollama" in model and model != self.cloud_model:
                 log_warning(f"Local model failed ({exc}), retrying with cloud…")
                 kwargs["model"] = self.cloud_model
+                # Replace endpoint kwargs for cloud model
+                for key in ("api_base", "api_key"):
+                    kwargs.pop(key, None)
+                kwargs.update(self._build_litellm_kwargs(self.cloud_model))
                 response = await litellm.acompletion(**kwargs)
                 return response.model_dump()
             raise

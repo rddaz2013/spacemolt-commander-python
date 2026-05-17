@@ -103,8 +103,29 @@
 
 
 # ============================================================================
-# PRESET 6: Abacus.AI Integration
-# Using Abacus.AI models (if you have a subscription)
+# PRESET 6: Abacus.AI Router Integration
+# Intelligent model routing via Abacus.AI RouteLLM
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# cloud_base_url: "https://routellm.abacus.ai/v1"   # ← Abacus.AI Router
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "abacus-bot"
+# mission: "Trade and explore using Abacus.AI intelligence."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: Depends on Abacus.AI subscription
+# Quality: ★★★★★ Excellent — automatic model routing
+# Speed: Moderate
+# Dependencies: ABACUS_API_KEY env var + active subscription
+
+
+# ============================================================================
+# PRESET 6b: Abacus.AI Direct
+# Using Abacus.AI models directly
 # ============================================================================
 
 # cloud_model: "abacus/gpt-4-turbo"
@@ -119,7 +140,7 @@
 # Cost: Depends on Abacus.AI subscription
 # Quality: ★★★★★ Excellent
 # Speed: Moderate
-# Dependencies: Abacus.AI API key + active subscription
+# Dependencies: ABACUS_API_KEY env var
 
 
 # ============================================================================
@@ -169,6 +190,67 @@
 
 
 # ============================================================================
+# PRESET 9: Remote Ollama (LAN Server)
+# Run Ollama on a separate machine with GPU
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# ollama_base_url: "http://192.168.1.100:11434"  # ← GPU server on LAN
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "remote-ollama"
+# mission: "Mine and trade efficiently."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: ~$0.05–$0.20 per day (only cloud for complex tasks)
+# Quality: ★★★★★ Excellent
+# Speed: ⚡⚡⚡ Fast (dedicated GPU server)
+# Dependencies: Ollama on remote + API key for cloud
+
+
+# ============================================================================
+# PRESET 10: Abacus.AI Router + Remote Ollama
+# Best of both worlds — cloud routing + local GPU
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# cloud_base_url: "https://routellm.abacus.ai/v1"
+# ollama_base_url: "http://192.168.1.100:11434"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "hybrid-pro"
+# mission: "Execute the most profitable strategy possible."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: Optimized via RouteLLM
+# Quality: ★★★★★ Excellent
+# Speed: ⚡⚡⚡ Fast (local + intelligent routing)
+# Dependencies: ABACUS_API_KEY + Ollama remote
+
+
+# ============================================================================
+# ENDPOINT CONFIGURATION
+# ============================================================================
+
+# Ollama endpoints (pick one):
+# ollama_base_url: "http://localhost:11434"         # Local (default)
+# ollama_base_url: "http://192.168.1.100:11434"     # Remote LAN IP
+# ollama_base_url: "http://gpu-server.local:11434"  # Remote hostname
+# ollama_base_url: "http://10.0.0.5:11434"          # VPN/Docker network
+# Or set OLLAMA_HOST environment variable instead.
+
+# Cloud endpoints (pick one):
+# cloud_base_url: "https://routellm.abacus.ai/v1"  # Abacus.AI Router
+# cloud_base_url: "https://api.openai.com/v1"       # OpenAI direct
+# cloud_base_url: "https://api.anthropic.com/v1"    # Anthropic direct
+# cloud_base_url: "http://localhost:8080/v1"         # Local proxy/vLLM
+
+
+# ============================================================================
 # ENVIRONMENT VARIABLES TO SET
 # ============================================================================
 
@@ -187,10 +269,14 @@
 # export GROQ_API_KEY="gsk_[your-key-here]"
 # Get from: https://console.groq.com/keys
 
-# Abacus.AI
-# =========
+# Abacus.AI (for models + Router)
+# ==============================
 # export ABACUS_API_KEY="[your-key-here]"
 # Get from: https://abacus.ai/app/account
+
+# Ollama Remote Host (alternative to ollama_base_url in config)
+# =============================================================
+# export OLLAMA_HOST="http://192.168.1.100:11434"
 
 
 # ============================================================================

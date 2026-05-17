@@ -30,6 +30,8 @@ def main(ctx: click.Context) -> None:
 @click.option("--local-model", default=None, help="Local LLM model (e.g. ollama/qwen3:8b)")
 @click.option("--session", "session_name", default="default", help="Session name for state persistence")
 @click.option("--url", default=None, help="SpaceMolt API base URL")
+@click.option("--ollama-url", default=None, help="Ollama base URL (e.g. http://192.168.1.100:11434)")
+@click.option("--cloud-url", default=None, help="Cloud LLM base URL (e.g. https://routellm.abacus.ai/v1)")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 @click.option("--force-credentials", is_flag=True, help="Allow overwriting stored credentials")
 @click.option("--backend", type=click.Choice(["auto", "local", "cloud"]), default="auto",
@@ -40,6 +42,8 @@ def run(
     local_model: str | None,
     session_name: str,
     url: str | None,
+    ollama_url: str | None,
+    cloud_url: str | None,
     debug: bool,
     force_credentials: bool,
     backend: str,
@@ -51,6 +55,8 @@ def run(
         local_model=local_model,
         session_name=session_name,
         url=url,
+        ollama_url=ollama_url,
+        cloud_url=cloud_url,
         debug=debug,
         force_credentials=force_credentials,
         backend=backend,
@@ -62,6 +68,8 @@ def run(
 @click.option("--local-model", default=None, help="Local LLM model")
 @click.option("--session", "session_name", default="default", help="Session name")
 @click.option("--url", default=None, help="SpaceMolt API base URL")
+@click.option("--ollama-url", default=None, help="Ollama base URL")
+@click.option("--cloud-url", default=None, help="Cloud LLM base URL")
 @click.option("--debug", is_flag=True, help="Enable debug logging")
 @click.option("--mission", default="Explore, mine, trade, and grow stronger.", help="Default mission")
 def service(
@@ -69,6 +77,8 @@ def service(
     local_model: str | None,
     session_name: str,
     url: str | None,
+    ollama_url: str | None,
+    cloud_url: str | None,
     debug: bool,
     mission: str,
 ) -> None:
@@ -80,6 +90,8 @@ def service(
         local_model=local_model,
         session_name=session_name,
         url=url,
+        ollama_url=ollama_url,
+        cloud_url=cloud_url,
         debug=debug,
         force_credentials=False,
         backend="auto",
@@ -119,6 +131,8 @@ async def _run_async(
     local_model: str | None,
     session_name: str,
     url: str | None,
+    ollama_url: str | None = None,
+    cloud_url: str | None = None,
     debug: bool,
     force_credentials: bool,
     backend: str,
@@ -139,6 +153,8 @@ async def _run_async(
         cloud_model=model or DEFAULT_CLOUD_MODEL,
         local_model=local_model or DEFAULT_LOCAL_MODEL,
         force_backend=force_be,
+        ollama_base_url=ollama_url,
+        cloud_base_url=cloud_url,
     )
 
     # Build API client

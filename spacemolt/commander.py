@@ -19,6 +19,7 @@ from spacemolt.compaction import CompactionState
 from spacemolt.llm_router import LLMRouter
 from spacemolt.loop import run_inner_loop
 from spacemolt.models import Credentials
+from spacemolt.game_sequences import get_sequence_list_for_prompt
 from spacemolt.schema import fetch_commands, format_command_list
 from spacemolt.session import SessionStore
 from spacemolt.ui import (
@@ -91,15 +92,20 @@ def build_system_prompt(
     if todo:
         sections.append(f"## Your TODO List\n{todo}")
 
+    # Predefined sequences
+    sections.append(f"## Predefined Sequences\n{get_sequence_list_for_prompt()}")
+
     # Rules / tips
     sections.append(
         "## Rules\n"
         "- Act autonomously. Do not ask the player for input — decide yourself.\n"
-        "- Use the 'game' tool for ALL game commands. Check the command list above.\n"
+        "- Use 'execute_sequence' for common multi-step workflows (mining, trading, flying, etc.).\n"
+        "- Use the 'game' tool for individual commands not covered by sequences.\n"
         "- Use 'execute_code' for data-heavy analysis (market comparisons, route planning).\n"
         "- Use 'update_todo' to track your goals and progress.\n"
         "- Query commands are free. Action commands cost 1 tick (10 s).\n"
         "- Keep your context lean — avoid requesting the same data repeatedly.\n"
+        "- PREFER sequences over individual game calls to save tokens and time.\n"
         "- If you're stuck, try 'spacemolt/get_guide' or 'spacemolt/get_commands'.\n"
         "- Always save credentials after registering or logging in."
     )
