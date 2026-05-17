@@ -17,6 +17,7 @@ from spacemolt.api import SpaceMoltAPI
 from spacemolt.code_executor import CodeExecutor
 from spacemolt.compaction import CompactionState
 from spacemolt.llm_router import LLMRouter
+from spacemolt.logger import get_logger
 from spacemolt.loop import run_inner_loop
 from spacemolt.models import Credentials
 from spacemolt.game_sequences import get_sequence_list_for_prompt
@@ -32,6 +33,8 @@ from spacemolt.ui import (
     show_banner,
     show_session_info,
 )
+
+_log = get_logger(__name__)
 
 OUTER_LOOP_DELAY = 2.0  # seconds between turns
 PROMPT_FILE = Path(__file__).parent / "prompt.md"
@@ -181,9 +184,14 @@ class Commander:
         """Initialise and enter the outer loop."""
         show_banner()
         show_session_info(self.session_store.name, self.router.cloud_model)
+        _log.info(
+            "Commander.start — session=%s dir=%s mission=%r",
+            self.session_store.name, self.session_store.directory, self.mission,
+        )
 
         # Check local LLM availability
         await self.router.check_local_availability()
+        _log.info("Local LLM available: %s", self.router.local_available)
 
         # Load game guide
         if PROMPT_FILE.exists():
@@ -273,9 +281,11 @@ class Commander:
                 self._refresh_system_prompt(creds)
 
             except asyncio.CancelledError:
+                _log.info("Outer loop cancelled")
                 break
             except Exception as exc:
                 log_error(f"Outer loop error: {exc}")
+                _log.exception("Outer loop error: %s", exc)
                 if self.debug:
                     import traceback
                     traceback.print_exc()

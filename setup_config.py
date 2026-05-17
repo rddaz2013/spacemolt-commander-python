@@ -1,490 +1,430 @@
 #!/usr/bin/env python3
+"""Interactive setup for SpaceMolt Commander.
+
+Creates the default session directory at::
+
+    ~/.spacemolt/sessions/default/
+
+and writes a fully-populated ``config.yaml`` containing:
+
+* LLM configuration for the **Abacus RouteLLM API** (cloud backend)
+* Spacemolt Game API endpoint (always v2)
+* Player / commander display name
+* Logging configuration (file + console, detailed format)
+* Default session metadata
+
+The script intentionally collects the **minimum** set of inputs required
+by the project spec:
+
+* Abacus RouteLLM API key
+* Player name
+
+All other values fall back to sensible defaults documented in
+``config.example.yaml``.
+
+Usage
+-----
+
+::
+
+    python setup_config.py            # interactive
+    python setup_config.py --non-interactive --player-name "Alice" \
+        --abacus-api-key "abc123"     # scripted
+
+Re-running the script asks before overwriting an existing config.yaml.
 """
-Interactive setup script for SpaceMolt Commander configuration.
 
-Guides users through:
-1. SpaceMolt API credentials
-2. LLM backend selection
-3. Cloud API key setup
-4. Ollama model configuration
-5. Session setup
+from __future__ import annotations
 
-Creates config.yaml automatically.
-"""
-
+import argparse
 import os
 import sys
-import json
-import subprocess
+from getpass import getpass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Optional
+
+try:
+    import yaml  # PyYAML
+except ImportError:  # pragma: no cover
+    sys.stderr.write(
+        "ERROR: PyYAML is not installed. Run: pip install -r requirements.txt\n"
+    )
+    sys.exit(1)
 
 
-# ANSI colors for terminal output
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
+# ---------------------------------------------------------------------------
+# Constants — single source of truth for default paths and URLs
+# ---------------------------------------------------------------------------
+
+SPACEMOLT_HOME: Path = Path(
+    os.environ.get("SPACEMOLT_HOME", str(Path.home() / ".spacemolt"))
+)
+SESSIONS_DIR: Path = SPACEMOLT_HOME / "sessions"
+DEFAULT_SESSION_NAME: str = "default"
+DEFAULT_SESSION_DIR: Path = SESSIONS_DIR / DEFAULT_SESSION_NAME
+DEFAULT_CONFIG_PATH: Path = DEFAULT_SESSION_DIR / "config.yaml"
+DEFAULT_LOG_PATH: Path = DEFAULT_SESSION_DIR / "session.log"
+DEFAULT_PLAYER_NAME_PATH: Path = DEFAULT_SESSION_DIR / "player.txt"
+DEFAULT_CREDENTIALS_PATH: Path = DEFAULT_SESSION_DIR / "credentials.json"
+
+# Game API — always v2 (v1 is deprecated and no longer used in this code base)
+GAME_API_BASE_URL: str = "https://game.spacemolt.com/api/v2/"
+
+# Abacus RouteLLM defaults
+LLM_API_BASE_URL: str = "https://routellm.abacus.ai/v1"
+LLM_DEFAULT_MODEL: str = "abacus/claude-sonnet-4-20250514"
+LLM_DEFAULT_LOCAL_MODEL: str = "ollama/qwen3:8b"
+LLM_DEFAULT_OLLAMA_URL: str = "http://localhost:11434"
+
+# Logging defaults — timestamps + function names are mandatory
+LOG_FORMAT: str = (
+    "%(asctime)s | %(levelname)-7s | %(name)s.%(funcName)s:%(lineno)d | %(message)s"
+)
+LOG_DATE_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
 
-def print_header(text: str) -> None:
-    """Print a colored header."""
-    print(f"\n{Colors.HEADER}{Colors.BOLD}{'=' * 70}{Colors.RESET}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{text:^70}{Colors.RESET}")
-    print(f"{Colors.HEADER}{Colors.BOLD}{'=' * 70}{Colors.RESET}\n")
+# ---------------------------------------------------------------------------
+# Tiny ANSI helpers (no third-party deps)
+# ---------------------------------------------------------------------------
+
+class _C:
+    HEADER = "\033[95m"
+    CYAN = "\033[96m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
 
 
-def print_section(text: str) -> None:
-    """Print a section header."""
-    print(f"\n{Colors.CYAN}{Colors.BOLD}▶ {text}{Colors.RESET}")
-    print(f"{Colors.CYAN}{'-' * (len(text) + 2)}{Colors.RESET}")
+def _header(text: str) -> None:
+    print(f"\n{_C.HEADER}{_C.BOLD}{'=' * 70}\n{text:^70}\n{'=' * 70}{_C.RESET}\n")
 
 
-def print_info(text: str) -> None:
-    """Print info message."""
-    print(f"{Colors.BLUE}ℹ {text}{Colors.RESET}")
+def _section(text: str) -> None:
+    print(f"\n{_C.CYAN}{_C.BOLD}▶ {text}{_C.RESET}\n{_C.CYAN}{'-' * (len(text) + 2)}{_C.RESET}")
 
 
-def print_success(text: str) -> None:
-    """Print success message."""
-    print(f"{Colors.GREEN}✓ {text}{Colors.RESET}")
+def _ok(text: str) -> None:
+    print(f"{_C.GREEN}✓ {text}{_C.RESET}")
 
 
-def print_warning(text: str) -> None:
-    """Print warning message."""
-    print(f"{Colors.YELLOW}⚠ {text}{Colors.RESET}")
+def _warn(text: str) -> None:
+    print(f"{_C.YELLOW}⚠ {text}{_C.RESET}")
 
 
-def print_error(text: str) -> None:
-    """Print error message."""
-    print(f"{Colors.RED}✗ {text}{Colors.RESET}")
+def _err(text: str) -> None:
+    print(f"{_C.RED}✗ {text}{_C.RESET}")
 
 
-def prompt(question: str, default: Optional[str] = None, required: bool = True) -> str:
-    """
-    Prompt user for input.
-    
-    Args:
-        question: The question to ask
-        default: Default value if user presses Enter
-        required: If True, reject empty input
-    
-    Returns:
-        User's response
-    """
+# ---------------------------------------------------------------------------
+# Prompt helpers
+# ---------------------------------------------------------------------------
+
+def prompt_input(
+    question: str,
+    default: Optional[str] = None,
+    required: bool = True,
+    secret: bool = False,
+) -> str:
+    """Prompt the user for a value with an optional default."""
+    suffix = f" [{default}]" if default else ""
+    label = f"{_C.BOLD}{question}{suffix}: {_C.RESET}"
+
     while True:
-        default_str = f" [{default}]" if default else ""
-        full_question = f"{Colors.BOLD}{question}{default_str}:{Colors.RESET} "
-        response = input(full_question).strip()
-        
-        if not response and default:
-            return default
-        
-        if not response and required:
-            print_error("This field is required. Please enter a value.")
-            continue
-        
-        if not response and not required:
-            return ""
-        
-        return response
-
-
-def prompt_choice(question: str, options: list[str]) -> str:
-    """
-    Prompt user to choose from a list.
-    
-    Args:
-        question: The question to ask
-        options: List of options
-    
-    Returns:
-        Selected option
-    """
-    print(f"\n{Colors.BOLD}{question}{Colors.RESET}")
-    for i, option in enumerate(options, 1):
-        print(f"  {Colors.CYAN}{i}){Colors.RESET} {option}")
-    
-    while True:
-        choice = input(f"{Colors.BOLD}Select (1-{len(options)}):{Colors.RESET} ").strip()
         try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(options):
-                return options[idx]
-        except ValueError:
-            pass
-        print_error(f"Please enter a number between 1 and {len(options)}")
+            value = (getpass(label) if secret else input(label)).strip()
+        except EOFError:
+            value = ""
+
+        if not value and default is not None:
+            return default
+        if not value and not required:
+            return ""
+        if not value and required:
+            _err("This field is required. Please enter a value.")
+            continue
+        return value
 
 
-def check_ollama_running() -> bool:
-    """Check if Ollama server is running."""
+def prompt_yes_no(question: str, default: bool = True) -> bool:
+    default_str = "Y/n" if default else "y/N"
+    while True:
+        ans = input(f"{_C.BOLD}{question} [{default_str}]: {_C.RESET}").strip().lower()
+        if not ans:
+            return default
+        if ans in ("y", "yes"):
+            return True
+        if ans in ("n", "no"):
+            return False
+        _err("Please answer y or n.")
+
+
+# ---------------------------------------------------------------------------
+# Filesystem helpers
+# ---------------------------------------------------------------------------
+
+def create_session_directory(session_dir: Path = DEFAULT_SESSION_DIR) -> Path:
+    """Create the session directory tree, returning the absolute path."""
+    session_dir.mkdir(parents=True, exist_ok=True)
+    # Tighten permissions on the parent so secrets aren't world-readable.
     try:
-        result = subprocess.run(
-            ["curl", "-s", "http://localhost:11434"],
-            capture_output=True,
-            timeout=2
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def get_ollama_models() -> list[str]:
-    """Get list of installed Ollama models."""
-    try:
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            lines = result.stdout.strip().split('\n')[1:]  # Skip header
-            models = []
-            for line in lines:
-                if line.strip():
-                    model_name = line.split()[0]
-                    models.append(f"ollama/{model_name}")
-            return models
-    except Exception:
+        os.chmod(SPACEMOLT_HOME, 0o700)
+        os.chmod(SESSIONS_DIR, 0o700)
+        os.chmod(session_dir, 0o700)
+    except OSError:
         pass
-    return []
+    return session_dir
 
 
-def setup_spacemolt_credentials() -> dict:
-    """Setup SpaceMolt API credentials."""
-    print_section("SpaceMolt API Credentials")
-    
-    print_info(
-        "SpaceMolt is a space mining MMO. Get your API credentials from:"
-    )
-    print(f"  {Colors.BOLD}https://game.spacemolt.com{Colors.RESET}")
-    print()
-    print_info("After login: Account Settings → Developer/API → Generate API Key")
-    print_info("⚠  Your API key will only be shown once! Copy it carefully.")
-    
-    api_url = prompt(
-        "SpaceMolt API URL",
-        default="https://game.spacemolt.com/api/v2",
-        required=False
-    )
-    
-    session_name = prompt(
-        "Session name (for storing credentials)",
-        default="default",
-        required=False
-    )
-    
+def get_default_config(
+    *,
+    abacus_api_key: str,
+    player_name: str,
+    session_name: str = DEFAULT_SESSION_NAME,
+) -> dict[str, Any]:
+    """Return the canonical config.yaml dictionary."""
     return {
-        "api_url": api_url or "https://game.spacemolt.com/api/v2",
-        "session_name": session_name or "default"
+        # --- LLM ---------------------------------------------------------
+        "llm": {
+            "api_key": abacus_api_key,
+            "api_base_url": LLM_API_BASE_URL,
+            "model": LLM_DEFAULT_MODEL,
+            "max_tokens": 4096,
+            "temperature": 0.3,
+            "local_model": LLM_DEFAULT_LOCAL_MODEL,
+            "ollama_base_url": LLM_DEFAULT_OLLAMA_URL,
+            "backend": "auto",
+        },
+
+        # --- Game API ----------------------------------------------------
+        "game_api": {
+            "base_url": GAME_API_BASE_URL,
+            "timeout": 30,
+            "max_retries": 6,
+        },
+
+        # --- Player ------------------------------------------------------
+        "player": {
+            "name": player_name,
+        },
+
+        # --- Session -----------------------------------------------------
+        "session": {
+            "default_session": session_name,
+        },
+
+        # --- Mission -----------------------------------------------------
+        "mission": (
+            "Explore the galaxy, mine ore, trade for profit, and grow stronger."
+        ),
+
+        # --- Logging -----------------------------------------------------
+        "logging": {
+            "enabled": True,
+            "level": "INFO",
+            "log_filename": "session.log",
+            "format": LOG_FORMAT,
+            "date_format": LOG_DATE_FORMAT,
+            "console": True,
+        },
+
+        # --- Behaviour ---------------------------------------------------
+        "debug": False,
+        "force_credentials": False,
+
+        # --- Legacy flat keys (kept for backward compatibility with the
+        #     existing Click-based CLI which reads top-level keys) -------
+        "cloud_model": LLM_DEFAULT_MODEL,
+        "local_model": LLM_DEFAULT_LOCAL_MODEL,
+        "api_url": GAME_API_BASE_URL,
+        "session_name": session_name,
+        "backend": "auto",
+        "cloud_base_url": LLM_API_BASE_URL,
+        "ollama_base_url": LLM_DEFAULT_OLLAMA_URL,
     }
 
 
-def setup_llm_backend() -> Tuple[str, str, str]:
-    """Setup LLM backend selection."""
-    print_section("LLM Backend Selection")
-    
-    print_info("The Commander uses TWO LLMs:")
-    print("  • Cloud Model: For complex tasks (strategy, planning, code)")
-    print("  • Local Model: For simple tasks (status checks, API calls)")
-    print()
-    
-    backend_options = [
-        "Auto (intelligent routing)",
-        "Cloud only (best quality, costs money)",
-        "Local only (free & private)"
-    ]
-    
-    backend_choice = prompt_choice(
-        "Choose backend strategy",
-        backend_options
+def write_config(config: dict[str, Any], path: Path = DEFAULT_CONFIG_PATH) -> None:
+    """Serialise ``config`` to YAML and write it to ``path`` (mode 0600)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = (
+        "# SpaceMolt Commander — generated by setup_config.py\n"
+        "#\n"
+        f"# Session directory: {path.parent}\n"
+        f"# Log file:          {path.parent / 'session.log'}\n"
+        "#\n"
+        "# Keep this file private — it contains your Abacus RouteLLM API key.\n"
+        "#\n"
+        "# To regenerate: rm config.yaml && python setup_config.py\n"
+        "\n"
     )
-    
-    backend = {
-        "Auto (intelligent routing)": "auto",
-        "Cloud only (best quality, costs money)": "cloud",
-        "Local only (free & private)": "local"
-    }[backend_choice]
-    
-    return backend
+    body = yaml.safe_dump(
+        config,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+        width=100,
+    )
+    path.write_text(header + body, encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
-def setup_cloud_model() -> str:
-    """Setup cloud LLM model."""
-    print_section("Cloud LLM Model")
-    
-    print_info("Choose your cloud LLM provider:")
-    
-    providers = [
-        "Anthropic Claude (recommended, best quality)",
-        "OpenAI GPT-4",
-        "Groq (free, fast)",
-        "Abacus.AI"
-    ]
-    
-    provider = prompt_choice("Select cloud provider", providers)
-    
-    if "Anthropic" in provider:
-        print_info("Get API key: https://console.anthropic.com/")
-        model = prompt(
-            "Claude model",
-            default="anthropic/claude-sonnet-4-20250514",
-            required=False
-        )
-        env_var = ("ANTHROPIC_API_KEY", "sk-ant-...")
-    
-    elif "OpenAI" in provider:
-        print_info("Get API key: https://platform.openai.com/api-keys")
-        model = prompt(
-            "OpenAI model",
-            default="openai/gpt-4o",
-            required=False
-        )
-        env_var = ("OPENAI_API_KEY", "sk-...")
-    
-    elif "Groq" in provider:
-        print_info("Get API key: https://console.groq.com/keys")
-        model = prompt(
-            "Groq model",
-            default="groq/mixtral-8x7b-32768",
-            required=False
-        )
-        env_var = ("GROQ_API_KEY", "gsk_...")
-    
-    else:  # Abacus.AI
-        print_info("Get API key: https://abacus.ai/app/account")
-        model = prompt(
-            "Abacus.AI model",
-            default="abacus/gpt-4-turbo",
-            required=False
-        )
-        env_var = ("ABACUS_API_KEY", "...")
-    
-    print_warning(f"Set environment variable: {env_var[0]}=\"{env_var[1]}\"")
-    
-    return model or "anthropic/claude-sonnet-4-20250514"
+def write_player_name(player_name: str, path: Path = DEFAULT_PLAYER_NAME_PATH) -> None:
+    """Persist the player name in a simple text file alongside config.yaml."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(player_name.strip() + "\n", encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
-def setup_local_model() -> str:
-    """Setup local Ollama model."""
-    print_section("Local LLM Model (Ollama)")
-    
-    ollama_installed = subprocess.run(
-        ["which", "ollama"],
-        capture_output=True
-    ).returncode == 0
-    
-    if not ollama_installed:
-        print_error("Ollama is not installed!")
-        print_info("Install from: https://ollama.ai")
-        install = prompt(
-            "Would you like to continue without local model setup?",
-            default="y",
-            required=False
-        ).lower()
-        return "ollama/qwen3:8b"
-    
-    if not check_ollama_running():
-        print_warning("Ollama server is not running")
-        print_info("Start with: ollama serve")
-        return "ollama/qwen3:8b"
-    
-    installed_models = get_ollama_models()
-    
-    if installed_models:
-        print_success(f"Found {len(installed_models)} installed model(s)")
-        installed_models.append("Download a different model...")
-        model = prompt_choice("Select local model", installed_models)
-        
-        if "Download" in model:
-            model_name = prompt(
-                "Model to download (e.g. qwen3:8b, llama3.1:8b, mistral:7b)",
-                required=False
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def setup_config(
+    *,
+    abacus_api_key: Optional[str] = None,
+    player_name: Optional[str] = None,
+    session_name: str = DEFAULT_SESSION_NAME,
+    non_interactive: bool = False,
+    overwrite: bool = False,
+) -> Path:
+    """Interactive entry point — returns the absolute path of the written config."""
+    _header("SpaceMolt Commander — Setup")
+
+    session_dir = SESSIONS_DIR / session_name
+    config_path = session_dir / "config.yaml"
+
+    print(f"Default session directory : {_C.BOLD}{session_dir}{_C.RESET}")
+    print(f"Default config file        : {_C.BOLD}{config_path}{_C.RESET}")
+    print(f"Default log file           : {_C.BOLD}{session_dir / 'session.log'}{_C.RESET}")
+    print(f"Game API endpoint          : {_C.BOLD}{GAME_API_BASE_URL}{_C.RESET}")
+    print(f"LLM endpoint               : {_C.BOLD}{LLM_API_BASE_URL}{_C.RESET}")
+    print()
+
+    # --- Overwrite guard -------------------------------------------------
+    if config_path.exists() and not overwrite:
+        if non_interactive:
+            _err(f"{config_path} already exists. Re-run with --overwrite to replace it.")
+            sys.exit(2)
+        if not prompt_yes_no(f"{config_path} already exists. Overwrite?", default=False):
+            _warn("Setup cancelled — existing config left in place.")
+            return config_path
+
+    # --- Collect inputs --------------------------------------------------
+    _section("Abacus RouteLLM API key")
+    print(
+        "Get your key from https://abacus.ai/app/account.  It will be saved\n"
+        "to the per-session config.yaml with file mode 0600."
+    )
+    if not abacus_api_key:
+        if non_interactive:
+            _err("Missing --abacus-api-key in non-interactive mode.")
+            sys.exit(2)
+        # Try environment first so the user can pre-export and just press Enter
+        env_key = os.environ.get("ABACUS_API_KEY", "").strip()
+        if env_key:
+            print(f"Using ABACUS_API_KEY from environment "
+                  f"({_C.GREEN}{'*' * 4}{env_key[-4:]}{_C.RESET}).")
+            abacus_api_key = env_key
+        else:
+            abacus_api_key = prompt_input(
+                "Abacus RouteLLM API key", required=True, secret=True
             )
-            if model_name:
-                print_info(f"Run: ollama pull {model_name}")
-                return f"ollama/{model_name}"
-    else:
-        print_warning("No Ollama models installed")
-        print_info("Download a model: ollama pull qwen3:8b")
-    
-    model = prompt(
-        "Local model to use",
-        default="ollama/qwen3:8b",
-        required=False
+
+    _section("Player name")
+    print("Your in-game commander / player display name (used for logs and prompts).")
+    if not player_name:
+        if non_interactive:
+            _err("Missing --player-name in non-interactive mode.")
+            sys.exit(2)
+        player_name = prompt_input("Player name", default="Commander", required=False)
+
+    # --- Build and write -------------------------------------------------
+    _section("Writing configuration")
+    create_session_directory(session_dir)
+    config = get_default_config(
+        abacus_api_key=abacus_api_key,
+        player_name=player_name,
+        session_name=session_name,
     )
-    
-    return model or "ollama/qwen3:8b"
+    write_config(config, config_path)
+    write_player_name(player_name, session_dir / "player.txt")
 
+    _ok(f"Wrote {config_path}")
+    _ok(f"Wrote {session_dir / 'player.txt'}")
+    _ok(f"Log file will be written to {session_dir / 'session.log'}")
 
-def setup_mission() -> str:
-    """Setup mission description."""
-    print_section("Mission Description")
-    
-    print_info("Define your mission for the autonomous agent.")
-    print_info("Examples:")
-    print("  • 'Mine ore and maximize profit'")
-    print("  • 'Explore and map unknown sectors'")
-    print("  • 'Trade for profit between stations'")
+    # --- Next steps ------------------------------------------------------
+    _section("Next steps")
+    print("1. Install dependencies (if not already):")
+    print(f"   {_C.BOLD}pip install -r requirements.txt{_C.RESET}")
     print()
-    
-    mission = prompt(
-        "Your mission",
-        default="Explore the galaxy, mine ore, trade for profit, and grow stronger.",
-        required=False
+    print("2. Run the commander:")
+    print(f"   {_C.BOLD}python -m spacemolt run \"Mine ore and get rich\"{_C.RESET}")
+    print()
+    print("3. Tail the log:")
+    print(f"   {_C.BOLD}tail -f {session_dir / 'session.log'}{_C.RESET}")
+    print()
+    _ok("Setup complete. 🚀")
+
+    return config_path
+
+
+def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Set up the SpaceMolt Commander default session.",
     )
-    
-    return mission or "Explore the galaxy, mine ore, trade for profit, and grow stronger."
+    parser.add_argument(
+        "--session-name",
+        default=DEFAULT_SESSION_NAME,
+        help=f"Session name (default: {DEFAULT_SESSION_NAME})",
+    )
+    parser.add_argument(
+        "--player-name",
+        default=None,
+        help="Player / commander display name.",
+    )
+    parser.add_argument(
+        "--abacus-api-key",
+        default=None,
+        help="Abacus RouteLLM API key (will be saved to config.yaml).",
+    )
+    parser.add_argument(
+        "--non-interactive", "-y",
+        action="store_true",
+        help="Fail rather than prompt when a value is missing.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite an existing config.yaml without prompting.",
+    )
+    return parser.parse_args(argv)
 
 
-def generate_config(
-    api_url: str,
-    session_name: str,
-    backend: str,
-    cloud_model: str,
-    local_model: str,
-    mission: str
-) -> str:
-    """Generate config.yaml content."""
-    
-    return f"""# SpaceMolt Commander — Configuration
-# Generated by setup_config.py
-
-# --- LLM Models ---
-cloud_model: "{cloud_model}"
-local_model: "{local_model}"
-
-# --- API ---
-api_url: "{api_url}"
-
-# --- Session ---
-session_name: "{session_name}"
-
-# --- Mission ---
-mission: "{mission}"
-
-# --- Behavior ---
-debug: false
-force_credentials: false
-
-# --- LLM Backend ---
-# auto  = intelligent routing (local for simple, cloud for complex)
-# local = Ollama only (fast, free)
-# cloud = Cloud models only (best quality, costs credits)
-backend: "{backend}"
-
-# --- Environment Variables ---
-# Set these in your shell, not here:
-# export ANTHROPIC_API_KEY="sk-ant-..."
-# export OPENAI_API_KEY="sk-..."
-# export GROQ_API_KEY="gsk_..."
-# export ABACUS_API_KEY="..."
-"""
-
-
-def save_config(config_path: Path, content: str) -> bool:
-    """Save config to file."""
+def main(argv: Optional[list[str]] = None) -> None:
+    args = _parse_args(argv)
     try:
-        config_path.write_text(content)
-        return True
-    except Exception as e:
-        print_error(f"Failed to save config: {e}")
-        return False
-
-
-def main():
-    """Main setup flow."""
-    print_header("SpaceMolt Commander — Interactive Setup")
-    
-    print_info("This wizard will help you configure the SpaceMolt Commander.")
-    print_info("Press Ctrl+C at any time to cancel.")
-    print()
-    
-    config_path = Path("config.yaml")
-    if config_path.exists():
-        overwrite = prompt(
-            "config.yaml already exists. Overwrite?",
-            default="n",
-            required=False
-        ).lower()
-        if overwrite != "y":
-            print_warning("Setup cancelled. Using existing config.")
-            return
-    
-    try:
-        # Setup sections
-        spacemolt_config = setup_spacemolt_credentials()
-        backend = setup_llm_backend()
-        
-        # Setup cloud model if needed
-        if backend in ["auto", "cloud"]:
-            cloud_model = setup_cloud_model()
-        else:
-            cloud_model = "anthropic/claude-sonnet-4-20250514"  # Unused
-        
-        # Setup local model if needed
-        if backend in ["auto", "local"]:
-            local_model = setup_local_model()
-        else:
-            local_model = "ollama/qwen3:8b"  # Unused
-        
-        # Setup mission
-        mission = setup_mission()
-        
-        # Generate and save config
-        config_content = generate_config(
-            api_url=spacemolt_config["api_url"],
-            session_name=spacemolt_config["session_name"],
-            backend=backend,
-            cloud_model=cloud_model,
-            local_model=local_model,
-            mission=mission
+        setup_config(
+            abacus_api_key=args.abacus_api_key,
+            player_name=args.player_name,
+            session_name=args.session_name,
+            non_interactive=args.non_interactive,
+            overwrite=args.overwrite,
         )
-        
-        # Summary
-        print_section("Configuration Summary")
-        print(config_content)
-        
-        confirm = prompt(
-            "Save this configuration?",
-            default="y",
-            required=False
-        ).lower()
-        
-        if confirm == "y":
-            if save_config(config_path, config_content):
-                print_success(f"Configuration saved to {config_path}")
-                
-                print_section("Next Steps")
-                print(f"1. Set your API key(s):")
-                if backend in ["auto", "cloud"]:
-                    print(f"   {Colors.BOLD}export ANTHROPIC_API_KEY=\"sk-ant-...\"{Colors.RESET}")
-                
-                print(f"\n2. Run the commander:")
-                print(f"   {Colors.BOLD}python -m spacemolt run \"{mission}\"{Colors.RESET}")
-                
-                print(f"\n3. Check session status:")
-                print(f"   {Colors.BOLD}python -m spacemolt status{Colors.RESET}")
-                
-                print(f"\n4. Start service mode (autonomous):")
-                print(f"   {Colors.BOLD}python -m spacemolt service{Colors.RESET}")
-                
-                print_success("Setup complete! 🚀")
-        else:
-            print_warning("Configuration not saved.")
-    
     except KeyboardInterrupt:
-        print("\n")
-        print_warning("Setup cancelled by user.")
+        print()
+        _warn("Setup cancelled by user.")
         sys.exit(1)
-    except Exception as e:
-        print_error(f"An error occurred: {e}")
+    except Exception as exc:  # pragma: no cover
+        _err(f"Setup failed: {exc}")
         sys.exit(1)
 
 
