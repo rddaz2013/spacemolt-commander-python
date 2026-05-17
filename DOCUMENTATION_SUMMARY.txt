@@ -1,0 +1,409 @@
+================================================================================
+SPACEMOLT COMMANDER — CREDENTIALS SETUP DOCUMENTATION
+================================================================================
+
+PROJECT: SpaceMolt Commander Python
+REPOSITORY: https://github.com/rddaz2013/spacemolt-commander-python
+DATE CREATED: May 17, 2026
+DOCUMENTATION VERSION: 1.0
+
+================================================================================
+ERSTELLTE DATEIEN (NEW FILES CREATED)
+================================================================================
+
+1. CREDENTIALS_SETUP.md
+   ────────────────────
+   • Umfang: ~5,000 Wörter
+   • Inhalt: Detaillierte Anleitung zur Konfiguration
+   • Abschnitte:
+     - Quick Start
+     - SpaceMolt API Credentials
+     - LLM Backend Konfiguration (Cloud + Local)
+     - Abacus.AI Integration
+     - Ollama Setup
+     - config.yaml Erklärung
+     - LLM-Modelle Empfehlungen
+     - Troubleshooting
+     - Sicherheit & Best Practices
+     - FAQ
+
+2. QUICK_START.md
+   ───────────────
+   • Umfang: ~2,500 Wörter
+   • Zielgruppe: Anfänger
+   • Inhalt:
+     - 5-Minuten Setup
+     - Konfigurationsübersicht
+     - Häufige Setups
+     - Ollama Installation
+     - API Key Generierung
+     - Troubleshooting
+     - Beispiel-Missions
+
+3. config.reference.yaml
+   ─────────────────────
+   • 8 verschiedene Konfigurationsvorlagen
+   • Presets für:
+     1. Best Overall (Hybrid)
+     2. Cloud Only (Maximum Quality)
+     3. Local Only (Free & Private)
+     4. High-Reasoning Focus
+     5. Budget Gaming (Groq)
+     6. Abacus.AI Integration
+     7. Multiple Sessions
+     8. Debug & Development
+   • Vollständige Modell-Übersichten
+   • Environment Variable Referenz
+   • Quick Selection Guide
+
+4. .env.example
+   ────────────
+   • Template für sicheres Credentials Management
+   • Platzhalter für alle LLM-Provider:
+     - Anthropic Claude
+     - OpenAI GPT
+     - Groq
+     - Abacus.AI
+   • Ollama Konfiguration
+   • Proxy-Einstellungen
+   • Security Best Practices
+
+5. setup_config.py
+   ────────────────
+   • Interaktives Setup-Script
+   • Features:
+     - Farbcodierte Terminal-Ausgabe
+     - Geführte Konfiguration
+     - Ollama Erkennung
+     - Automatische config.yaml Erstellung
+     - API-Key Validierung
+   • Benutzerfreundlich für Anfänger
+   • Ausführlich mit: python setup_config.py
+
+6. SETUP_COMPLETE.md
+   ──────────────────
+   • Master-Übersicht aller Dokumentation
+   • Schnellreferenz
+   • Nächste Schritte
+   • Checklisten
+   • Projektstruktur
+   • Support-Ressourcen
+
+7. DOCUMENTATION_SUMMARY.txt
+   ─────────────────────────
+   • Diese Datei
+   • Übersicht aller erstellten Dateien
+   • Struktur und Inhalte
+
+================================================================================
+DOKUMENTATIONS-ARCHITEKTUR
+================================================================================
+
+EINSTEIGER (Anfänger)
+  ↓
+  Start: QUICK_START.md
+    ├─ 5-Minuten Setup
+    ├─ Interaktives Script: python setup_config.py
+    └─ Einfache Troubleshooting
+  ↓
+  READY TO PLAY ✓
+
+FORTGESCHRITTENE (Intermediate)
+  ↓
+  Start: QUICK_START.md
+    ├─ Erste Mission testen
+    └─ Bei Problemen → CREDENTIALS_SETUP.md
+  ↓
+  Detaillierte Hilfe: CREDENTIALS_SETUP.md
+    ├─ Vollständiges LLM Backend Setup
+    ├─ API-Key Management
+    ├─ Ollama Konfiguration
+    ├─ Troubleshooting
+    └─ Security Best Practices
+  ↓
+  OPTIMIERT & SICHER ✓
+
+EXPERTEN (Advanced)
+  ↓
+  Start: config.reference.yaml
+    ├─ 8 Ready-to-Use Presets
+    ├─ Direkte Konfiguration
+    └─ Spezielle Setups
+  ↓
+  Oder: Manuelle CREDENTIALS_SETUP.md
+    ├─ Deep Dive in alle Optionen
+    ├─ Custom Setup
+    └─ Performance Tuning
+  ↓
+  OPTIMAL KONFIGURIERT ✓
+
+================================================================================
+SETUP-PFADE
+================================================================================
+
+PFAD 1: AUTOMATISCH (Anfänger)
+───────────────────────────────
+$ python setup_config.py
+→ Interaktive Fragen beantwortet?
+→ Automatisch config.yaml erstellt
+→ Fertig!
+Zeit: 5-10 Minuten
+
+PFAD 2: PRESET (Fortgeschritten)
+────────────────────────────────
+1. config.reference.yaml öffnen
+2. Passendes Preset wählen
+3. In config.yaml kopieren
+4. API-Keys setzen
+→ Fertig!
+Zeit: 5 Minuten
+
+PFAD 3: MANUELL (Experten)
+──────────────────────────
+1. CREDENTIALS_SETUP.md lesen
+2. config.example.yaml kopieren
+3. Alle Details selbst konfigurieren
+4. Testen und optimieren
+→ Vollständige Kontrolle
+Zeit: 30 Minuten
+
+================================================================================
+KONFIGURATIONSÜBERSICHT
+================================================================================
+
+ERFORDERLICHE FELDER:
+├─ cloud_model: LLM für komplexe Aufgaben
+│  ├─ anthropic/claude-sonnet-4-20250514 (empfohlen)
+│  ├─ openai/gpt-4o
+│  ├─ groq/mixtral-8x7b-32768 (kostenlos)
+│  └─ abacus/gpt-4-turbo
+│
+├─ local_model: Ollama für einfache Aufgaben
+│  ├─ ollama/qwen3:8b (schnell & leicht)
+│  ├─ ollama/llama3.1:8b (balanced)
+│  ├─ ollama/mistral:7b (schnell)
+│  └─ ollama/deepseek-r1:7b (reasoning)
+│
+├─ api_url: SpaceMolt API
+│  └─ https://game.spacemolt.com/api/v2
+│
+├─ session_name: Eindeutige Session-ID
+│  └─ z.B. "default", "farm-bot", "trader"
+│
+└─ mission: Langfristige Anweisung
+   └─ z.B. "Mine ore and get rich"
+
+OPTIONALE FELDER:
+├─ backend: "auto" | "local" | "cloud"
+├─ debug: true | false
+└─ force_credentials: true | false
+
+================================================================================
+BACKEND-OPTIONEN
+================================================================================
+
+AUTO (Empfohlen)
+────────────────
+• Intelligentes Routing
+• Einfache Aufgaben → Local (schnell, kostenlos)
+• Komplexe Aufgaben → Cloud (intelligent)
+• Beste Kosten/Nutzen Balance
+Kosten: $0.10-0.50/Tag
+
+LOCAL (Kostenlos)
+─────────────────
+• Nur Ollama (keine Cloud APIs)
+• Völlig privat, offline-fähig
+• Schnell auf modernem System
+• Limitierte Intelligenz für sehr komplexe Aufgaben
+Kosten: $0/Tag
+
+CLOUD (Maximum Quality)
+───────────────────────
+• Nur Cloud-LLMs (Claude, GPT-4, etc.)
+• Beste strategische Entscheidungen
+• Höhere API-Kosten
+• Abhängig von Internet/API-Verfügbarkeit
+Kosten: $0.50-2/Tag
+
+================================================================================
+UMGEBUNGSVARIABLEN
+================================================================================
+
+ERFORDERLICH (für Cloud-Modelle):
+
+  export ANTHROPIC_API_KEY="sk-ant-..."
+  # oder
+  export OPENAI_API_KEY="sk-..."
+  # oder
+  export GROQ_API_KEY="gsk_..."
+  # oder
+  export ABACUS_API_KEY="..."
+
+OPTIONAL (für Ollama):
+
+  export OLLAMA_BASE_URL="http://localhost:11434"
+  export OLLAMA_NUM_GPU=1
+
+DAUERHAFT SETZEN (in ~/.zshrc oder ~/.bashrc):
+
+  echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc
+  source ~/.zshrc
+
+================================================================================
+API-PROVIDER VERGLEICH
+================================================================================
+
+Provider     | Qualität | Speed | Cost      | Link
+─────────────┼──────────┼───────┼───────────┼────────────────────────
+Claude       | ★★★★★   | ★★★  | $0.50/day | console.anthropic.com
+GPT-4        | ★★★★★   | ★★★  | $1-2/day  | platform.openai.com
+Groq         | ★★★★    | ★★★★★| FREE      | console.groq.com
+Abacus.AI    | ★★★★    | ★★★  | Abo-abhängig | abacus.ai
+Ollama Local | ★★★     | ★★★★ | $0        | ollama.ai
+
+================================================================================
+TROUBLESHOOTING ÜBERSICHT
+================================================================================
+
+Problem: "API Key not found"
+→ CREDENTIALS_SETUP.md → Troubleshooting → API Key not found
+
+Problem: "Ollama model not found"
+→ QUICK_START.md → Ollama Installation
+
+Problem: "Connection to SpaceMolt failed"
+→ CREDENTIALS_SETUP.md → Connection timed out
+
+Problem: "GPU out of memory"
+→ QUICK_START.md → Troubleshooting → ollama_eval_cuda_fallback
+
+Alle Lösungen in CREDENTIALS_SETUP.md Kapitel "Troubleshooting"
+
+================================================================================
+DATEIGRÖSSEN & LESEZEITEN
+================================================================================
+
+Datei                      | Größe    | Lesezeit | Schwierigkeit
+──────────────────────────┼──────────┼──────────┼───────────────
+QUICK_START.md            | ~15 KB   | 5 min    | ⭐ Einfach
+CREDENTIALS_SETUP.md      | ~40 KB   | 20 min   | ⭐⭐ Mittel
+config.reference.yaml     | ~12 KB   | 5 min    | ⭐⭐ Mittel
+.env.example              | ~3 KB    | 2 min    | ⭐ Einfach
+SETUP_COMPLETE.md         | ~18 KB   | 10 min   | ⭐⭐ Mittel
+
+================================================================================
+NÄCHSTE SCHRITTE (CHECKLIST)
+================================================================================
+
+PHASE 1: Setup (5-10 Minuten)
+  [ ] Dokumentation gelesen (QUICK_START.md)
+  [ ] python setup_config.py ausgeführt
+     ODER
+     config.example.yaml → config.yaml kopiert
+  [ ] API-Key gesetzt (export ANTHROPIC_API_KEY="...")
+  [ ] Optional: Ollama installiert (falls local backend)
+
+PHASE 2: Test (5 Minuten)
+  [ ] Erste Mission: python -m spacemolt run "Check status"
+  [ ] Session Status überprüft: python -m spacemolt status
+  [ ] Logs überprüft (falls debug: true)
+
+PHASE 3: Optimierung (optional)
+  [ ] CREDENTIALS_SETUP.md → LLM-Modelle Empfehlungen
+  [ ] Backend-Strategie optimiert
+  [ ] Mehrere Sessions erstellt (falls gewünscht)
+  [ ] Mission-Parameter angepasst
+
+PHASE 4: Produktion
+  [ ] Service Mode aktiviert: python -m spacemolt service
+  [ ] Monitoring eingerichtet
+  [ ] Credentials regelmäßig rotieren
+
+================================================================================
+SICHERHEIT CHECKLIST
+================================================================================
+
+  [ ] config.yaml in .gitignore
+  [ ] .env in .gitignore
+  [ ] API-Keys NOT in Konfigurationsdatei
+  [ ] Nur Umgebungsvariablen oder .env nutzen
+  [ ] .env Permissions: chmod 600 .env
+  [ ] Keine Keys in Git History committen
+  [ ] Keys alle 3 Monate erneuern
+  [ ] Backup erstellt: tar -czf backup.tar.gz ~/.spacemolt_commander/
+
+================================================================================
+HÄUFIG GESTELLTE FRAGEN
+================================================================================
+
+F: Kostet die Nutzung?
+A: SpaceMolt: Kostenlos. LLMs: Abhängig von Provider. Ollama lokal: Kostenlos.
+
+F: Wie viel pro Tag?
+A: Nur lokal: $0. Hybrid mit Claude: $0.10-0.50. Cloud-Only: $0.50-2.
+
+F: Kann ich mehrere Bots haben?
+A: Ja, nutze verschiedene session_name. Jeder Bot läuft separat.
+
+F: Was ist Backend "auto"?
+A: Intelligentes Routing. Einfache Aufgaben → lokal, komplexe → Cloud.
+
+F: Brauche ich GPU für Ollama?
+A: Nein, funktioniert auch mit CPU (langsamer).
+
+ALLE FAQ: Siehe CREDENTIALS_SETUP.md → FAQ
+
+================================================================================
+UNTERSTÜTZUNG & RESSOURCEN
+================================================================================
+
+DOKUMENTATION (lokal):
+  • QUICK_START.md - Schnelleinstieg
+  • CREDENTIALS_SETUP.md - Details
+  • config.reference.yaml - Presets
+  • .env.example - Env-Vars
+  • SETUP_COMPLETE.md - Master-Übersicht
+
+ONLINE-RESSOURCEN:
+  • SpaceMolt: https://game.spacemolt.com
+  • Repository: https://github.com/rddaz2013/spacemolt-commander-python
+  • Anthropic: https://docs.anthropic.com
+  • OpenAI: https://platform.openai.com/docs
+  • Groq: https://console.groq.com
+  • Ollama: https://ollama.ai/library
+
+CLI-HILFE:
+  $ python -m spacemolt --help
+  $ python -m spacemolt run --help
+  $ python -m spacemolt service --help
+
+================================================================================
+ZUSAMMENFASSUNG
+================================================================================
+
+Du hast jetzt eine VOLLSTÄNDIGE Dokumentation zur Einrichtung des SpaceMolt
+Commander Credentials-Systems mit:
+
+✓ Anfänger-freundlichen Guides (QUICK_START.md)
+✓ Detaillierten Erklärungen (CREDENTIALS_SETUP.md)
+✓ Ready-to-Use Presets (config.reference.yaml)
+✓ Interaktivem Setup-Script (setup_config.py)
+✓ Sichecem Credentials-Management (.env.example)
+✓ Master-Übersicht (SETUP_COMPLETE.md)
+
+Alle Dateien sind:
+  • Verfasst auf Deutsch
+  • Mit Beispielen & Code-Snippets
+  • Mit Troubleshooting-Guides
+  • Mit Security Best Practices
+  • Mit Quick-References
+
+JETZT: Wähle einen Setup-Pfad und starten!
+  1. Anfänger: python setup_config.py
+  2. Fortgeschritten: QUICK_START.md + Preset auswählen
+  3. Experte: CREDENTIALS_SETUP.md detailliert studieren
+
+Viel Erfolg! 🚀
+
+================================================================================

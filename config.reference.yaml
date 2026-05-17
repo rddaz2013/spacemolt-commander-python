@@ -1,0 +1,266 @@
+# SpaceMolt Commander — Configuration Reference
+# This file contains example configurations for different scenarios
+# Copy the relevant section to your config.yaml
+
+# ============================================================================
+# PRESET 1: Best Overall (Recommended)
+# Cloud + Local Hybrid with Auto-Routing
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "default"
+# mission: "Explore the galaxy, mine ore, trade for profit, and grow stronger."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: ~$0.10–$0.50 per day
+# Quality: ★★★★★ Excellent
+# Speed: Fast for simple tasks, optimized for complex decisions
+# Dependencies: API key (Anthropic) + Ollama running
+
+
+# ============================================================================
+# PRESET 2: Cloud Only (Best Quality)
+# Maximum intelligence for strategic gameplay
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"  # Not used, can be anything
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "default"
+# mission: "Execute the most profitable strategy possible."
+# debug: false
+# force_credentials: false
+# backend: "cloud"
+
+# Cost: ~$0.50–$2 per day
+# Quality: ★★★★★ Excellent — best decision making
+# Speed: Slightly slower due to cloud latency
+# Dependencies: API key (Anthropic)
+
+
+# ============================================================================
+# PRESET 3: Local Only (Free & Private)
+# No cloud API calls, everything runs locally
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"  # Not used
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "default"
+# mission: "Mine ore and maximize profit without going offline."
+# debug: false
+# force_credentials: false
+# backend: "local"
+
+# Cost: $0 (completely free)
+# Quality: ★★★ Good — sufficient for most tasks
+# Speed: ⚡⚡⚡ Very fast (everything local)
+# Dependencies: Ollama installed + running
+
+
+# ============================================================================
+# PRESET 4: High-Reasoning Focus
+# Best for complex planning and analysis
+# ============================================================================
+
+# cloud_model: "openai/gpt-4o"
+# local_model: "ollama/deepseek-r1:7b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "reasoning-bot"
+# mission: "Analyze all trading opportunities and execute the best strategy."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: ~$0.30–$0.80 per day
+# Quality: ★★★★★ Excellent for reasoning
+# Speed: Moderate
+# Dependencies: OpenAI API key + Ollama (with deepseek-r1)
+
+
+# ============================================================================
+# PRESET 5: Budget Gaming (Groq Free Tier)
+# Fast, free cloud model
+# ============================================================================
+
+# cloud_model: "groq/mixtral-8x7b-32768"
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "budget-bot"
+# mission: "Explore and mine efficiently while minimizing costs."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: $0 (Groq free tier)
+# Quality: ★★★★ Very good
+# Speed: ⚡⚡⚡ Very fast (Groq is optimized for speed)
+# Dependencies: Groq API key (free)
+
+
+# ============================================================================
+# PRESET 6: Abacus.AI Integration
+# Using Abacus.AI models (if you have a subscription)
+# ============================================================================
+
+# cloud_model: "abacus/gpt-4-turbo"
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "abacus-bot"
+# mission: "Trade and explore using Abacus.AI intelligence."
+# debug: false
+# force_credentials: false
+# backend: "auto"
+
+# Cost: Depends on Abacus.AI subscription
+# Quality: ★★★★★ Excellent
+# Speed: Moderate
+# Dependencies: Abacus.AI API key + active subscription
+
+
+# ============================================================================
+# PRESET 7: Multiple Sessions (Farming + Trading)
+# Two separate bots with different strategies
+# ============================================================================
+
+# Session 1: Farming Bot (mining ore)
+# ========================
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "farm-bot"
+# mission: "Mine ore continuously and maximize yield."
+# backend: "auto"
+
+# Session 2: Trading Bot (profit maximization)
+# ========================
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/llama3.1:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "trader-bot"
+# mission: "Find and execute profitable trade routes."
+# backend: "cloud"  # Cloud for better trading decisions
+
+# Start sessions in separate terminals:
+# Terminal 1: python -m spacemolt run "..." --session farm-bot
+# Terminal 2: python -m spacemolt run "..." --session trader-bot
+
+
+# ============================================================================
+# PRESET 8: Debug & Development
+# Verbose logging for troubleshooting
+# ============================================================================
+
+# cloud_model: "anthropic/claude-sonnet-4-20250514"
+# local_model: "ollama/qwen3:8b"
+# api_url: "https://game.spacemolt.com/api/v2"
+# session_name: "debug"
+# mission: "Test basic game mechanics."
+# debug: true  # ← Enable verbose logging
+# force_credentials: true  # ← Always prompt for credentials
+# backend: "auto"
+
+# Logs saved to: ~/.spacemolt_commander/logs/
+# Check logs for troubleshooting
+
+
+# ============================================================================
+# ENVIRONMENT VARIABLES TO SET
+# ============================================================================
+
+# Anthropic Claude
+# ================
+# export ANTHROPIC_API_KEY="sk-ant-[your-key-here]"
+# Get from: https://console.anthropic.com/
+
+# OpenAI GPT
+# ==========
+# export OPENAI_API_KEY="sk-[your-key-here]"
+# Get from: https://platform.openai.com/api-keys
+
+# Groq (free)
+# ===========
+# export GROQ_API_KEY="gsk_[your-key-here]"
+# Get from: https://console.groq.com/keys
+
+# Abacus.AI
+# =========
+# export ABACUS_API_KEY="[your-key-here]"
+# Get from: https://abacus.ai/app/account
+
+
+# ============================================================================
+# AVAILABLE CLOUD MODELS
+# ============================================================================
+
+# Anthropic (Best for strategic gameplay)
+# anthropic/claude-sonnet-4-20250514      ← Recommended
+# anthropic/claude-3-haiku-20240307
+# anthropic/claude-3-opus-20240229
+
+# OpenAI (GPT-4 family)
+# openai/gpt-4o
+# openai/gpt-4o-mini
+# openai/gpt-4-turbo
+# openai/gpt-3.5-turbo
+
+# Groq (Fast, free)
+# groq/mixtral-8x7b-32768                 ← Free tier
+# groq/llama2-70b-4096
+# groq/llama3-70b-8192
+
+# Abacus.AI
+# abacus/gpt-4-turbo
+# abacus/gpt-3.5-turbo
+
+
+# ============================================================================
+# AVAILABLE LOCAL MODELS (Ollama)
+# ============================================================================
+
+# Fast & Lightweight (recommended for production)
+# ollama/qwen3:8b              ← Very fast, good quality
+# ollama/qwen2.5:7b           ← Lightweight
+# ollama/mistral:7b           ← Fast, 32K context
+
+# Balanced Performance
+# ollama/llama3.1:8b          ← Good balance, 128K context
+# ollama/neural-chat:7b       ← Good for dialogue
+# ollama/dolphin-mixtral:8x7b ← High quality
+
+# High-Quality (more resources needed)
+# ollama/deepseek-r1:7b       ← Good reasoning
+# ollama/qwen3:32b            ← Larger model (needs 19GB RAM)
+# ollama/llama3.1:70b         ← Largest (needs 40GB RAM)
+
+# Download with: ollama pull [model-name]
+
+
+# ============================================================================
+# QUICK SELECTION GUIDE
+# ============================================================================
+
+# "I want the best experience"
+# → Use PRESET 1 (Hybrid) with Anthropic Claude
+
+# "I have no budget"
+# → Use PRESET 3 (Local Only) with qwen3:8b
+
+# "I want maximum speed"
+# → Use PRESET 5 (Groq) or PRESET 3 (Ollama)
+
+# "I want to use Ollama"
+# → Use PRESET 3 (Local) with your chosen model
+
+# "I have Abacus.AI subscription"
+# → Use PRESET 6 (Abacus.AI)
+
+# "I want to run multiple bots"
+# → Use PRESET 7 (Multiple Sessions)
+
+# "I'm debugging an issue"
+# → Use PRESET 8 (Debug Mode)
