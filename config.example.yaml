@@ -1,44 +1,116 @@
 # SpaceMolt Commander — Example Configuration
-# Copy to config.yaml and adjust to your setup.
+#
+# Copy this file to either ~/.spacemolt/sessions/default/config.yaml
+# (preferred — interactive setup will do this for you) or to ./config.yaml
+# in your working directory.
+#
+# The interactive setup (`python setup_config.py`) will create this file
+# with your real values pre-filled.
 
-# --- LLM Models ---
-cloud_model: "anthropic/claude-sonnet-4-20250514"   # Strategic decisions, code gen
-local_model: "ollama/qwen3:8b"            # Simple API calls (requires Ollama)
+# ---------------------------------------------------------------------------
+# LLM configuration — Abacus RouteLLM API (default cloud backend)
+# ---------------------------------------------------------------------------
+llm:
+  # Abacus RouteLLM API key.  Get yours from https://abacus.ai/app/account
+  # Leave blank here and export ABACUS_API_KEY in your shell instead if you
+  # prefer not to keep secrets in this file.
+  api_key: ""
 
-# --- LLM Endpoints (flexible configuration) ---
-# Ollama URL — supports local, remote, and IP-based endpoints:
-#   ollama_base_url: "http://localhost:11434"       # Default (local)
-#   ollama_base_url: "http://192.168.1.100:11434"   # Remote Ollama on LAN
-#   ollama_base_url: "http://my-ollama-server:11434" # Remote hostname
-# Also respects the OLLAMA_HOST environment variable.
+  # Base URL of the RouteLLM gateway (OpenAI-compatible endpoint)
+  api_base_url: "https://routellm.abacus.ai/v1"
 
-# Cloud base URL — for custom/alternative providers:
-#   cloud_base_url: "https://routellm.abacus.ai/v1"  # Abacus.AI Router
-#   cloud_base_url: "https://api.openai.com/v1"       # OpenAI direct
-#   cloud_base_url: "https://my-proxy.example.com/v1" # Custom proxy
+  # Default model served by RouteLLM
+  model: "abacus/claude-sonnet-4-20250514"
 
-# --- API ---
-api_url: "https://game.spacemolt.com/api/v2"
+  # Generation parameters
+  max_tokens: 4096
+  temperature: 0.3
 
-# --- Session ---
-session_name: "default"
+  # Optional local LLM fallback (Ollama).  Used when backend == "auto" or "local".
+  local_model: "ollama/qwen3:8b"
+  ollama_base_url: "http://localhost:11434"
 
-# --- Mission ---
+  # Backend selection: "auto" | "cloud" | "local"
+  backend: "auto"
+
+# ---------------------------------------------------------------------------
+# Spacemolt Game API
+# ---------------------------------------------------------------------------
+game_api:
+  # IMPORTANT: always use the v2 endpoint.  The legacy v1 endpoint is no
+  # longer supported anywhere in this code base.
+  base_url: "https://game.spacemolt.com/api/v2/"
+  timeout: 30
+  max_retries: 6
+
+# ---------------------------------------------------------------------------
+# Player
+# ---------------------------------------------------------------------------
+player:
+  # In-game player / commander name.  Used for logging and to label saved
+  # sessions.  This is *not* a login credential — actual login credentials
+  # are stored in credentials.json inside the session directory.
+  name: "Commander"
+
+# ---------------------------------------------------------------------------
+# Session
+# ---------------------------------------------------------------------------
+session:
+  # Active session name.  Each session has its own directory under
+  # ~/.spacemolt/sessions/<default_session>/ containing this config.yaml,
+  # credentials.json, TODO.md, handoff.md, wiki.json and session.log.
+  default_session: "default"
+
+# ---------------------------------------------------------------------------
+# Mission (default for `spacemolt run` / service mode)
+# ---------------------------------------------------------------------------
 mission: "Explore the galaxy, mine ore, trade for profit, and grow stronger."
 
-# --- Behaviour ---
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  # Master switch — set to false to disable file logging entirely.
+  enabled: true
+
+  # Python logging level.  Use DEBUG for verbose troubleshooting.
+  # Allowed: DEBUG | INFO | WARNING | ERROR | CRITICAL
+  level: "INFO"
+
+  # Log file name (created inside the session directory, e.g.
+  # ~/.spacemolt/sessions/default/session.log).
+  log_filename: "session.log"
+
+  # Detailed format that includes timestamps, logger name, function name
+  # and severity — required by the project logging spec.
+  format: "%(asctime)s | %(levelname)-7s | %(name)s.%(funcName)s:%(lineno)d | %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+
+  # Also echo log lines to the console (stderr).  The Rich-based UI in
+  # ui.py is separate and continues to provide pretty terminal output.
+  console: true
+
+# ---------------------------------------------------------------------------
+# Behaviour
+# ---------------------------------------------------------------------------
 debug: false
 force_credentials: false
 
-# --- LLM Backend ---
-# auto  — route automatically (local for simple, cloud for complex)
-# local — force all requests through Ollama
-# cloud — force all requests through the cloud provider
+# ---------------------------------------------------------------------------
+# Legacy flat keys (kept for backward compatibility with the existing CLI)
+# ---------------------------------------------------------------------------
+cloud_model: "abacus/claude-sonnet-4-20250514"
+local_model: "ollama/qwen3:8b"
+api_url: "https://game.spacemolt.com/api/v2/"
+session_name: "default"
 backend: "auto"
+cloud_base_url: "https://routellm.abacus.ai/v1"
+ollama_base_url: "http://localhost:11434"
 
-# --- Environment Variables (set in your shell, not here) ---
-# ANTHROPIC_API_KEY=sk-ant-...
-# OPENAI_API_KEY=sk-...
-# GROQ_API_KEY=gsk_...
-# ABACUS_API_KEY=...          (for Abacus.AI models / Router)
-# OLLAMA_HOST=http://192.168.1.100:11434  (alternative to ollama_base_url)
+# ---------------------------------------------------------------------------
+# Environment variables (set in your shell, NOT here):
+#   ABACUS_API_KEY="..."              # Abacus RouteLLM API key (recommended)
+#   ANTHROPIC_API_KEY="sk-ant-..."    # Direct Anthropic (alternative)
+#   OPENAI_API_KEY="sk-..."           # Direct OpenAI (alternative)
+#   OLLAMA_HOST="http://host:11434"   # Alternative to llm.ollama_base_url
+# ---------------------------------------------------------------------------

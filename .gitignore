@@ -12,5 +12,12 @@ sessions/*/credentials.json
 sessions/*/TODO.md
 sessions/*/handoff.md
 sessions/*/wiki.json
+sessions/*/session.log
+sessions/*/session.log.*
+sessions/*/player.txt
 .venv/
 venv/
+
+# Generated documentation artefacts
+Setup_Install.docx
+Setup_Install.pdf

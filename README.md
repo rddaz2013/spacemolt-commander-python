@@ -43,22 +43,40 @@
 
 ## Quick Start
 
+> **Full Linux install guide:** see [`Setup_Install.md`](Setup_Install.md) for
+> step-by-step instructions (system requirements, `pip` install without a
+> virtual environment, troubleshooting).
+
 ```bash
-# 1. Install
-pip install -e .
+# 1. Clone the master branch
+git clone --branch master https://github.com/rddaz2013/spacemolt-commander-python.git
+cd spacemolt-commander-python
 
-# 2. Set your API key
-export ANTHROPIC_API_KEY=sk-ant-...
+# 2. Install dependencies (pip, no venv required)
+python3 -m pip install --user -r requirements.txt
+python3 -m pip install --user -e .
 
-# 3. Run with a mission
-spacemolt run "mine ore and get rich" --session my_first_run
+# 3. Run the interactive setup
+#    Writes ~/.spacemolt/sessions/default/config.yaml
+#    Asks only for: Abacus RouteLLM API key + player name
+python3 setup_config.py
 
-# 4. Or in service mode (continuous)
-spacemolt service --mission "dominate the galaxy"
+# 4. Run with a mission
+spacemolt run "mine ore and get rich" --session default
 
-# 5. Check session status
-spacemolt status --session my_first_run
+# 5. Tail the session log (timestamps + function names)
+tail -f ~/.spacemolt/sessions/default/session.log
 ```
+
+### Default paths
+
+| File | Location |
+|------|----------|
+| Configuration | `~/.spacemolt/sessions/default/config.yaml` |
+| Log file      | `~/.spacemolt/sessions/default/session.log` |
+| Credentials   | `~/.spacemolt/sessions/default/credentials.json` |
+| Game API      | `https://game.spacemolt.com/api/v2/` (v1 is **not** used anywhere) |
+| LLM endpoint  | `https://routellm.abacus.ai/v1` (Abacus RouteLLM, default) |
 
 ## Hybrid LLM Architecture
 
@@ -105,14 +123,33 @@ All API results are formatted as YAML (more compact than JSON).
 
 ## Configuration
 
-Copy `config.example.yaml` to `config.yaml`:
+The recommended way is to let `setup_config.py` create
+`~/.spacemolt/sessions/default/config.yaml` for you (see
+[`Setup_Install.md`](Setup_Install.md)).  See
+[`config.example.yaml`](config.example.yaml) for the full reference,
+including the `llm`, `game_api`, `player`, `session` and `logging`
+sections.  Minimal manual config:
 
 ```yaml
-cloud_model: "anthropic/claude-sonnet-4-20250514"
-local_model: "ollama/qwen3:8b"
-api_url: "https://game.spacemolt.com/api/v2"
-session_name: "default"
-backend: "auto"
+llm:
+  api_key: ""                                # or export ABACUS_API_KEY
+  api_base_url: "https://routellm.abacus.ai/v1"
+  model: "abacus/claude-sonnet-4-20250514"
+
+game_api:
+  base_url: "https://game.spacemolt.com/api/v2/"
+
+player:
+  name: "Commander"
+
+session:
+  default_session: "default"
+
+logging:
+  enabled: true
+  level: "INFO"
+  log_filename: "session.log"
+  format: "%(asctime)s | %(levelname)-7s | %(name)s.%(funcName)s:%(lineno)d | %(message)s"
 ```
 
 ## Project Structure

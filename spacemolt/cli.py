@@ -13,6 +13,7 @@ import sys
 import click
 
 from spacemolt import __version__
+from spacemolt.logger import get_logger, setup_logging
 
 
 @click.group(invoke_without_command=True)
@@ -141,6 +142,19 @@ async def _run_async(
     from spacemolt.commander import Commander
     from spacemolt.llm_router import LLMRouter, DEFAULT_CLOUD_MODEL, DEFAULT_LOCAL_MODEL
     from spacemolt.models import LLMBackend
+
+    # Initialise per-session logging FIRST so every subsequent module logs
+    # into the correct ~/.spacemolt/sessions/<session>/session.log file.
+    setup_logging(
+        session_name=session_name,
+        level="DEBUG" if debug else "INFO",
+        console=False,  # the Rich UI already prints to the terminal
+    )
+    log = get_logger(__name__)
+    log.info(
+        "Starting commander — session=%s mission=%r backend=%s debug=%s",
+        session_name, mission, backend, debug,
+    )
 
     # Build router
     force_be = None

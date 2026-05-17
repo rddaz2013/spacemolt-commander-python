@@ -14,8 +14,11 @@ from typing import TYPE_CHECKING, Any, Optional
 import httpx
 
 from spacemolt import __version__
+from spacemolt.logger import get_logger
 from spacemolt.models import ApiResponse, ApiSession
 from spacemolt.ui import json_to_yaml, log_error, log_info, log_warning
+
+_log = get_logger(__name__)
 
 if TYPE_CHECKING:
     from spacemolt.wiki import WikiStore
@@ -101,6 +104,7 @@ class SpaceMoltAPI:
         - Feeds both result and structuredContent to the Wiki knowledge base
         - Processes notifications for wiki learning
         """
+        _log.debug("execute — command=%s args=%s", command, args)
         await self.ensure_session()
 
         # Build the path from the command name
